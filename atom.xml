@@ -4,7 +4,7 @@
   <title><![CDATA[Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-04-11T00:00:32-05:00</updated>
+  <updated>2013-04-11T01:11:04-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -12,6 +12,528 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Ruby, Perl and Eloquence]]></title>
+    <link href="http://absurdfarce.github.com/blog/2012/07/10/ruby-perl-and-eloquence/"/>
+    <updated>2012-07-10T12:00:00-05:00</updated>
+    <id>http://absurdfarce.github.com/blog/2012/07/10/ruby-perl-and-eloquence</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2012/07/ruby-perl-and-eloquence.html">Heuristic Fencepost</a></p>
+
+<p>In an attempt to make my Ruby code a bit more idiomatic I&#8217;ve been spending a bit of time recently with Russ Olsen&#8217;s excellent <a href="http://eloquentruby.com">Eloquent Ruby</a>. There are many reasons to love writing Ruby code, not least of which is that Ruby deploys the same terse but expressive power of Perl while employing better overall principles of programming. The effect isn&#8217;t universal; on occasion my problems with Ruby look quite a bit like my problems with Perl. Given the overall elegance of the language it seems likely that there&#8217;s a &#8220;better&#8221; (or at least more idiomatic) way to accomplish my goal. And so I turn to <em>Eloquent Ruby</em>.</p>
+
+<p>As an example of this tension consider the following example.</p>
+
+<p>Perl has a well-deserved reputation for efficiently processing text files with regular expressions. We&#8217;ll consider an example from another text I&#8217;ve been spending a bit of time with: Hofstadter&#8217;s seminal <a href="http://en.wikipedia.org/wiki/G%C3%B6del,_Escher,_Bach">Godel, Escher, Bach</a>. A simple implementation of the productions of the MIU system in Perl [1] might look like the following:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='perl'><span class='line'><span class="c1"># Simple implementation of the productions for the MIU system</span>
+</span><span class='line'><span class="nb">open</span> <span class="n">INFILE</span><span class="p">,</span><span class="s">&quot;&lt;&quot;</span><span class="p">,</span><span class="nv">$ARGV</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+</span><span class='line'><span class="k">while</span><span class="p">(</span><span class="sr">&lt;INFILE&gt;</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="nb">chomp</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">next</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /#.*/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$1IU\n&quot;</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.+?)I$/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;M$1$1\n&quot;</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^M(.+)$/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$1U$2\n&quot;</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.*)III(.*)$/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$1$2\n&quot;</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.*)UU(.*)$/</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Reasonable enough, but there&#8217;s a lot of magic going on here. We&#8217;re relying on the &#8220;magic&#8221; variable $_ to access the current line, and to make things worse we have to obtain those lines using the INFILE identifier that only has meaning due to a side effect of the open() call [2]. There&#8217;s also those &#8220;magic&#8221; $1 and $2 variables for accessing capture groups in a regex.</p>
+
+<p>The Ruby version is both slightly shorter and a bit cleaner:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># Simple implementation of the productions for the MIU system</span>
+</span><span class='line'><span class="no">File</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="no">ARGV</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span><span class="p">)</span><span class="o">.</span><span class="n">readlines</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">line</span> <span class="o">|</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">next</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/#.*/</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="vg">$1</span><span class="si">}</span><span class="s2">IU</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/^(.+)I$/</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;M</span><span class="si">#{</span><span class="vg">$1</span><span class="si">}#{</span><span class="vg">$1</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/^M(.+)$/</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="vg">$1</span><span class="si">}</span><span class="s2">U</span><span class="si">#{</span><span class="vg">$2</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/^(.*)III(.*)$/</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="vg">$1</span><span class="si">}#{</span><span class="vg">$2</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/^(.*)UU(.*)$/</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>We&#8217;ve made some nice strides here. The use of File.new() allows us to avoid open() and it&#8217;s side effects. The use of a code block allows us to remove the global $_ in favor of a scoped variable line.</p>
+
+<p>But we&#8217;re still stuck with $1 and $2 for those capture groups.</p>
+
+<p>One can imagine an elegant object-oriented solution based on match objects. Any such implementation would have to accomplish three things:</p>
+
+<ul>
+<li>The match object will be used as the condition of an if/unless expression so nil should be returned if there&#8217;s no match</li>
+<li>The match object should be bound to a variable name in scope</li>
+<li>References to capture groups in the if-clause should use the scoped variable rather than the $1,$2, etc.</li>
+</ul>
+
+
+<p>But remember, this exercise is only useful if we don&#8217;t have to compromise on elegance. If all we&#8217;re after is an explicit object-oriented solution we could go with the Python version:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="c"># Simple implementation of the productions for the MIU system</span>
+</span><span class='line'><span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">argv</span>
+</span><span class='line'><span class="kn">import</span> <span class="nn">re</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">re_c</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;#.*&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">re1</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;^(.+?)I$&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">re2</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;^M(.+)$&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">re3</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;^(.*)III(.*)$&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">re4</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;^(.*)UU(.*)$&quot;</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">])]:</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">re_c</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+</span><span class='line'>        <span class="k">continue</span>
+</span><span class='line'>    <span class="n">m1</span> <span class="o">=</span> <span class="n">re1</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">m1</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">print</span> <span class="n">m1</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;IU&quot;</span>
+</span><span class='line'>    <span class="n">m2</span> <span class="o">=</span> <span class="n">re2</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">m2</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">print</span> <span class="s">&quot;M&quot;</span> <span class="o">+</span> <span class="n">m2</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">m2</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">m3</span> <span class="o">=</span> <span class="n">re3</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">m3</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">print</span> <span class="n">m3</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;U&quot;</span> <span class="o">+</span> <span class="n">m3</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">m4</span> <span class="o">=</span> <span class="n">re4</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">m4</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">print</span> <span class="n">m4</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">m4</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>That&#8217;s probably not what we want. [3]</p>
+
+<p>After pondering this question for a bit we realize we may not be in such a bad spot. /regex/.match(str) already returns nil if there is no match so our first requirement is satisfied. Assignment is just another expression, so our match object (or nil) will be returned to the if-expression test, helping us with our second goal. And match objects provide access to capture groups using []. So long as the assigned variable is in scope we should have everything we need. A bit of scuffling [4] brings us to the following:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># Implementation of the productions for the MIU system with match objects</span>
+</span><span class='line'><span class="no">File</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="no">ARGV</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span><span class="p">)</span><span class="o">.</span><span class="n">readlines</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">line</span> <span class="o">|</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">next</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/#.*/</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">foo</span> <span class="o">=</span> <span class="kp">nil</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}</span><span class="s2">IU</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">foo</span> <span class="o">=</span> <span class="sr">/^(.+)I$/</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;M</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">foo</span> <span class="o">=</span> <span class="sr">/^M(.+)$/</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}</span><span class="s2">U</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">2</span><span class="o">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">foo</span> <span class="o">=</span> <span class="sr">/^(.*)III(.*)$/</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">2</span><span class="o">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">foo</span> <span class="o">=</span> <span class="sr">/^(.*)UU(.*)$/</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This example is free of any &#8220;magic&#8221; variables, although we have sacrificed a bit on the clarity front. It&#8217;s also worth noting that we could have accomplished something very similar in Perl:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='perl'><span class='line'><span class="c1"># Implementation of the productions for the MIU system with match objects</span>
+</span><span class='line'><span class="nb">open</span> <span class="n">INFILE</span><span class="p">,</span><span class="s">&quot;&lt;&quot;</span><span class="p">,</span><span class="nv">$ARGV</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+</span><span class='line'><span class="k">while</span><span class="p">(</span><span class="sr">&lt;INFILE&gt;</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="nb">chomp</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">next</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /#.*/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$foo[0]IU\n&quot;</span> <span class="k">if</span> <span class="p">(</span><span class="nv">@foo</span> <span class="o">=</span> <span class="p">(</span><span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.+?)I$/</span><span class="p">));</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;M$foo[0]$foo[0]\n&quot;</span> <span class="k">if</span> <span class="p">(</span><span class="nv">@foo</span> <span class="o">=</span> <span class="p">(</span><span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^M(.+)$/</span><span class="p">));</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$foo[0]U$foo[1]\n&quot;</span> <span class="k">if</span> <span class="p">(</span><span class="nv">@foo</span> <span class="o">=</span> <span class="p">(</span><span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.*)III(.*)$/</span><span class="p">));</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$foo[0]$foo[1]\n&quot;</span> <span class="k">if</span> <span class="p">(</span><span class="nv">@foo</span> <span class="o">=</span> <span class="p">(</span><span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.*)UU(.*)$/</span><span class="p">));</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This implementation is hardly idiomatic. It&#8217;s also quite a bit less clear than our earlier efforts in the language.</p>
+
+<p>Where does this leave us? Do we keep in touch with our Perl roots and live with $1 in order to keep things terse and expressive? Do we sacrifice a bit of clarity and go with an object-oriented approach? Or do we do something else entirely?</p>
+
+<p>Answers to this question (and others like it) are what I&#8217;m hoping to get out of <em>Eloquent Ruby</em>.</p>
+
+<p>[1] We&#8217;re ignoring nasty things like error handling and complex edge cases in order to keep the conversation focused.</p>
+
+<p>[2] We could use lexical file handles here but that doesn&#8217;t really change the underlying point. Even in that case we still have to call open() in order for $fh to be useful.</p>
+
+<p>[3] Python does a lot of things very, very well, but this solution to this problem seems unnecessarily verbose.</p>
+
+<p>[4] The requirement to declare foo in advance when using the modifier form of if was a bit surprising. Shifting to an if expression removed this requirement; in that case assignment in the condition. The upcoming Perl version also didn&#8217;t require this advance declaration when using an equivalent to the modifier form. An MRI quirk, perhaps?</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Musings on List Comprehensions, Functional Programming and Python]]></title>
+    <link href="http://absurdfarce.github.com/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/"/>
+    <updated>2011-11-25T12:00:00-06:00</updated>
+    <id>http://absurdfarce.github.com/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2011/11/musings-on-list-comprehensions.html">Heuristic Fencepost</a></p>
+
+<p>For simplicity and elegance in your programming constructs the <a href="http://en.wikipedia.org/wiki/List_comprehension">list comprehension</a> is hard to beat. [1] A list comprehension can filter an input list, transform it or do both, all in a single expression and with very readable syntax. At it&#8217;s best a list comprehension is &#8220;beautiful code&#8221; distilled: very clear and expressive with no unnecessary noise. You can, of course, make list comprehensions &#8220;ugly&#8221; but at least you have to try a bit to do so.</p>
+
+<p>List comprehensions have their roots in functional programming and several modern functional languages include support for them. We&#8217;ll see comprehensions in Haskell, Clojure and Scala. [2] Python also includes support for comprehensions; in fact the basis for <a href="http://www.artima.com/weblogs/viewpost.jsp?thread=98196">Guido&#8217;s argument</a> to remove the map and filter functions from py3k was that expressions using these functions could be easily re-written as comprehensions. We also consider comprehensions in Python, including differences between the Python implementation and those in other languages and what effect those differences may have.</p>
+
+<p>Let&#8217;s consider a fairly straightforward problem problem: given a list of (x,y) coordinates in some two-dimensional space provide a list of the coordinates that are within some fixed distance of the origin of (0,0). Our application also requires that results be displayed in <a href="http://en.wikipedia.org/wiki/Polar_coordinates">polar coordinates</a>, so for extra bonus points we should return our results in that notation. We can solve the problem quite easily in Haskell and Clojure using list comprehensions:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='haskell'><span class='line'><span class="nf">toDegrees</span> <span class="ow">::</span> <span class="kt">Floating</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</span><span class='line'><span class="nf">toDegrees</span> <span class="n">rad</span> <span class="ow">=</span> <span class="n">rad</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="n">pi</span>
+</span><span class='line'>
+</span><span class='line'><span class="nf">euclidean</span> <span class="ow">::</span> <span class="kt">Floating</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</span><span class='line'><span class="nf">euclidean</span> <span class="n">x</span> <span class="n">y</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">foo</span> <span class="ow">=</span> <span class="n">x</span> <span class="o">^^</span> <span class="mi">2</span>
+</span><span class='line'>                  <span class="n">bar</span> <span class="ow">=</span> <span class="n">y</span> <span class="o">^^</span> <span class="mi">2</span>
+</span><span class='line'>              <span class="kr">in</span> <span class="n">sqrt</span> <span class="p">(</span><span class="n">foo</span> <span class="o">+</span> <span class="n">bar</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+</span><span class='line'>     <span class="n">print</span> <span class="p">[(</span><span class="n">euclidean</span> <span class="n">x</span> <span class="n">y</span><span class="p">,(</span><span class="n">toDegrees</span> <span class="o">.</span> <span class="n">atan</span><span class="p">)</span> <span class="p">(</span><span class="n">y</span> <span class="o">/</span> <span class="n">x</span><span class="p">))</span><span class="o">|</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span><span class="ow">&lt;-</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)],(</span><span class="n">euclidean</span> <span class="n">x</span> <span class="n">y</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">euclidean</span> <span class="p">[</span><span class="nv">x</span> <span class="nv">y</span><span class="p">]</span> <span class="p">(</span><span class="nf">Math/sqrt</span> <span class="p">(</span><span class="nb">+ </span><span class="p">(</span><span class="nf">Math/pow</span> <span class="nv">x</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="nf">Math/pow</span> <span class="nv">y</span> <span class="mi">2</span><span class="p">))))</span>
+</span><span class='line'><span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nb">for </span><span class="p">[</span>
+</span><span class='line'>    <span class="p">[</span><span class="nv">x</span>,<span class="nv">y</span><span class="p">]</span>
+</span><span class='line'>     <span class="p">[[</span><span class="mi">1</span>,<span class="mi">2</span><span class="p">]</span>,<span class="p">[</span><span class="mi">2</span>,<span class="mi">3</span><span class="p">]</span>,<span class="p">[</span><span class="mi">3</span>,<span class="mi">4</span><span class="p">]]</span>
+</span><span class='line'>      <span class="ss">:when</span> <span class="p">(</span><span class="nb">&gt; </span><span class="p">(</span><span class="nf">euclidean</span> <span class="nv">x</span> <span class="nv">y</span><span class="p">)</span> <span class="mf">3.0</span><span class="p">)]</span>
+</span><span class='line'>       <span class="p">[(</span><span class="nf">euclidean</span> <span class="nv">x</span> <span class="nv">y</span><span class="p">)</span>,<span class="p">(</span><span class="nf">Math/toDegrees</span> <span class="p">(</span><span class="nf">Math/atan</span> <span class="p">(</span><span class="nb">/ </span><span class="nv">y</span> <span class="nv">x</span><span class="p">)))]))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>In Scala we use for expressions to accomplish something very similar:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">import</span> <span class="nn">scala.math.</span><span class="o">{</span><span class="n">atan</span><span class="o">,</span><span class="n">pow</span><span class="o">,</span><span class="n">sqrt</span><span class="o">,</span><span class="n">toDegrees</span><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">val</span> <span class="n">result</span> <span class="k">=</span>
+</span><span class='line'>  <span class="k">for</span> <span class="o">{</span>
+</span><span class='line'>    <span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="n">y</span><span class="o">)</span> <span class="k">&lt;-</span> <span class="nc">List</span><span class="o">((</span><span class="mi">1</span><span class="o">,</span><span class="mi">2</span><span class="o">),(</span><span class="mi">2</span><span class="o">,</span><span class="mi">3</span><span class="o">),(</span><span class="mi">3</span><span class="o">,</span><span class="mi">4</span><span class="o">))</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">sqrt</span><span class="o">((</span><span class="n">pow</span><span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="mi">2</span><span class="o">))</span> <span class="o">+</span> <span class="o">(</span><span class="n">pow</span><span class="o">(</span><span class="n">y</span><span class="o">,</span><span class="mi">2</span><span class="o">)))</span> <span class="o">&gt;</span> <span class="mf">3.0</span> <span class="o">}</span>
+</span><span class='line'>  <span class="k">yield</span> <span class="o">(</span><span class="n">sqrt</span><span class="o">((</span><span class="n">pow</span><span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="mi">2</span><span class="o">))</span> <span class="o">+</span> <span class="o">(</span><span class="n">pow</span><span class="o">(</span><span class="n">y</span><span class="o">,</span><span class="mi">2</span><span class="o">))),</span><span class="n">toDegrees</span><span class="o">(</span><span class="n">atan</span><span class="o">(</span><span class="n">y</span><span class="o">.</span><span class="n">toFloat</span><span class="o">/</span><span class="n">x</span><span class="o">)))</span>
+</span><span class='line'><span class="n">println</span><span class="o">(</span><span class="n">result</span><span class="o">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>And finally, a straightforward solution in Python:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">atan</span><span class="p">,</span> <span class="n">degrees</span>
+</span><span class='line'><span class="n">data</span><span class="o">=</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)]</span>
+</span><span class='line'><span class="k">print</span> <span class="p">[(</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span><span class="n">degrees</span><span class="p">(</span><span class="n">atan</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">/</span><span class="n">x</span><span class="p">)))</span> <span class="k">for</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="n">data</span> <span class="k">if</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Note that in each of these solutions we&#8217;re doing a bit more work than we need to. Our implementation computes the distance from the origin twice, once when filtering values and again when generating the final output of the transformation process. This seems unnecessary; a better option would be to somehow define this value as intermediate state. This state could then be available to both filter and transform expressions. Haskell and Clojure support the introduction of intermediate bindings in their comprehension syntax:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='haskell'><span class='line'><span class="nf">toDegrees</span> <span class="ow">::</span> <span class="kt">Floating</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</span><span class='line'><span class="nf">toDegrees</span> <span class="n">rad</span> <span class="ow">=</span> <span class="n">rad</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="n">pi</span>
+</span><span class='line'>
+</span><span class='line'><span class="nf">euclidean</span> <span class="ow">::</span> <span class="kt">Floating</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</span><span class='line'><span class="nf">euclidean</span> <span class="n">x</span> <span class="n">y</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">foo</span> <span class="ow">=</span> <span class="n">x</span> <span class="o">^^</span> <span class="mi">2</span>
+</span><span class='line'>                  <span class="n">bar</span> <span class="ow">=</span> <span class="n">y</span> <span class="o">^^</span> <span class="mi">2</span>
+</span><span class='line'>              <span class="kr">in</span> <span class="n">sqrt</span> <span class="p">(</span><span class="n">foo</span> <span class="o">+</span> <span class="n">bar</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+</span><span class='line'>     <span class="n">print</span> <span class="p">[(</span><span class="n">dist</span><span class="p">,(</span><span class="n">toDegrees</span> <span class="o">.</span> <span class="n">atan</span><span class="p">)</span> <span class="p">(</span><span class="n">y</span> <span class="o">/</span> <span class="n">x</span><span class="p">))</span><span class="o">|</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span><span class="ow">&lt;-</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)],</span><span class="kr">let</span> <span class="n">dist</span><span class="ow">=</span><span class="n">euclidean</span> <span class="n">x</span> <span class="n">y</span><span class="p">,</span><span class="n">dist</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">euclidean</span> <span class="p">[</span><span class="nv">x</span> <span class="nv">y</span><span class="p">]</span> <span class="p">(</span><span class="nf">Math/sqrt</span> <span class="p">(</span><span class="nb">+ </span><span class="p">(</span><span class="nf">Math/pow</span> <span class="nv">x</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="nf">Math/pow</span> <span class="nv">y</span> <span class="mi">2</span><span class="p">))))</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nb">for </span><span class="p">[</span>
+</span><span class='line'>    <span class="p">[</span><span class="nv">x</span>,<span class="nv">y</span><span class="p">]</span>
+</span><span class='line'>     <span class="p">[[</span><span class="mi">1</span>,<span class="mi">2</span><span class="p">]</span>,<span class="p">[</span><span class="mi">2</span>,<span class="mi">3</span><span class="p">]</span>,<span class="p">[</span><span class="mi">3</span>,<span class="mi">4</span><span class="p">]]</span>
+</span><span class='line'>      <span class="ss">:let</span> <span class="p">[</span><span class="nv">dist</span> <span class="p">(</span><span class="nf">euclidean</span> <span class="nv">x</span> <span class="nv">y</span><span class="p">)]</span>
+</span><span class='line'>       <span class="ss">:when</span> <span class="p">(</span><span class="nb">&gt; </span><span class="nv">dist</span> <span class="mf">3.0</span><span class="p">)]</span>
+</span><span class='line'>        <span class="p">[</span><span class="nv">dist</span>,<span class="p">(</span><span class="nf">Math/toDegrees</span> <span class="p">(</span><span class="nf">Math/atan</span> <span class="p">(</span><span class="nb">/ </span><span class="nv">y</span> <span class="nv">x</span><span class="p">)))]))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Scala also allows for intermediate bindings within a for expression:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">import</span> <span class="nn">scala.math.</span><span class="o">{</span><span class="n">atan</span><span class="o">,</span><span class="n">pow</span><span class="o">,</span><span class="n">sqrt</span><span class="o">,</span><span class="n">toDegrees</span><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">val</span> <span class="n">result</span> <span class="k">=</span>
+</span><span class='line'>  <span class="k">for</span> <span class="o">{</span>
+</span><span class='line'>    <span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="n">y</span><span class="o">)</span> <span class="k">&lt;-</span> <span class="nc">List</span><span class="o">((</span><span class="mi">1</span><span class="o">,</span><span class="mi">2</span><span class="o">),(</span><span class="mi">2</span><span class="o">,</span><span class="mi">3</span><span class="o">),(</span><span class="mi">3</span><span class="o">,</span><span class="mi">4</span><span class="o">))</span>
+</span><span class='line'>    <span class="n">dist</span> <span class="k">=</span> <span class="n">sqrt</span><span class="o">((</span><span class="n">pow</span><span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="mi">2</span><span class="o">))</span> <span class="o">+</span> <span class="o">(</span><span class="n">pow</span><span class="o">(</span><span class="n">y</span><span class="o">,</span><span class="mi">2</span><span class="o">)))</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">dist</span> <span class="o">&gt;</span> <span class="mf">3.0</span> <span class="o">}</span>
+</span><span class='line'>  <span class="k">yield</span> <span class="o">(</span><span class="n">dist</span><span class="o">,</span><span class="n">toDegrees</span><span class="o">(</span><span class="n">atan</span><span class="o">(</span><span class="n">y</span><span class="o">.</span><span class="n">toFloat</span><span class="o">/</span><span class="n">x</span><span class="o">)))</span>
+</span><span class='line'><span class="n">println</span><span class="o">(</span><span class="n">result</span><span class="o">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>What about Python? It turns out we cannot solve this problem in Python using a single comprehension; the syntax doesn&#8217;t allow for the introduction of intermediate state which can be used in either the predicate or transform expression. On the face of it this seems a bit odd; the language encourages the use of comprehensions for filtering and/or transformation while providing a less robust version of that very construct. To some degree this discrepancy reflects differing language goals. Guido&#8217;s post on the history of list comprehensions seems to indicate that the motivation for adding these features was pragmatic; the syntax is an elegant way to express most filter and transform operations. Functional languages use list comprehensions as &#8220;syntactic sugar&#8221; for monadic effects [3] that don&#8217;t really have an equivalent in standard Python usage. The syntax may look the same, but if you&#8217;re coming from a functional perspective they can feel just a bit off. The same is true for a few other common functional idioms:</p>
+
+<ul>
+<li>Lazy evaluation - List comprehensions in Python are not lazily evaluated. Generator expressions, which look very similar to list comprehensions, are lazily evaluated.</li>
+<li>Higher-order functions - Anonymous functions are supported in Python but these functions are famously limited to a single expression. Functions can return functions but for non-trivial functions a named function must be declared and returned.</li>
+</ul>
+
+
+<p>A couple things should be noted here. First, let us clearly state that Python is not and does not claim to be a functional programming language. While absolutely true, this fact doesn&#8217;t change the underlying point. Moving from functional concepts back into Python can be a bit jarring; some things look similar but don&#8217;t behave quite like you&#8217;d expect.</p>
+
+<p>It&#8217;s also worth noting that the inability to solve this problem with list comprehensions in Python doesn&#8217;t mean that this problem cannot be solved in idiomatic Python. We wish to return our intermediate state as well as filter results based on it&#8217;s value; this dual use allows us to solve the problem with nested comprehensions. The inner comprehension will generate the final representation (including the intermediate state) and the outer comprehension will filter results based on that representation. In Python this looks something like:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">atan</span><span class="p">,</span> <span class="n">degrees</span>
+</span><span class='line'><span class="n">data</span><span class="o">=</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)]</span>
+</span><span class='line'><span class="k">print</span> <span class="p">[(</span><span class="n">dist</span><span class="p">,</span><span class="n">degrees</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">dist</span><span class="p">,</span><span class="n">degrees</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[(</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span><span class="n">degrees</span><span class="p">(</span><span class="n">atan</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">/</span><span class="n">x</span><span class="p">)))</span> <span class="k">for</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span> <span class="k">if</span> <span class="n">dist</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This works only because the intermediate state is also returned in the final result. If that state were not explicitly returned (i.e. if it&#8217;s values were used as input to a conditional expression which returned, say, a string value describing the distance) this solution would not apply.</p>
+
+<p>We can also solve this problem using generators. Using the state maintained by the generator we can iterate through the list, compute the intermediate state and yield a value only when we&#8217;ve satisfied our predicate. A generator-based solution would look something like:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">atan</span><span class="p">,</span> <span class="n">degrees</span>
+</span><span class='line'><span class="n">data</span><span class="o">=</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)]</span>
+</span><span class='line'><span class="k">def</span> <span class="nf">somefunc</span><span class="p">(</span><span class="n">alist</span><span class="p">):</span>
+</span><span class='line'>    <span class="k">for</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="n">alist</span><span class="p">:</span>
+</span><span class='line'>    <span class="n">dist</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">dist</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">):</span>
+</span><span class='line'>            <span class="k">yield</span> <span class="p">(</span><span class="n">dist</span><span class="p">,</span><span class="n">degrees</span><span class="p">(</span><span class="n">atan</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">/</span><span class="n">x</span><span class="p">)))</span>
+</span><span class='line'><span class="k">print</span> <span class="nb">list</span><span class="p">(</span><span class="n">somefunc</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Finally, none of these comments should be construed as a criticism of Python, the design choices that went into the language or the inclusion of list comprehensions generally. The pragmatic case for inclusion of this feature seems very strong. This post is interested only in the interplay between these features and similar features in other languages.</p>
+
+<p>[1] Some languages (perhaps most notably Scala) use the term &#8220;for comprehension&#8221; or &#8220;for expression&#8221;, and in some of these languages (Scala again) these constructs are more flexible than a list comprehension. That said, it&#8217;s fairly straightforward to make Scala&#8217;s for expressions behave like conventional list comprehensions.</p>
+
+<p>[2] A purist might object that Scala is designed to mix features of object-oriented and functional languages, but the bias in favor of functional constructs justifies Scala&#8217;s inclusion here.</p>
+
+<p>[3] As an example, note that in Haskell list comprehensions can be replaced with do-notation. See the Haskell wiki for details.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[A Funny Thing Happened While Writing Some Haskell....]]></title>
+    <link href="http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot/"/>
+    <updated>2010-12-20T12:00:00-06:00</updated>
+    <id>http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/12/funny-thing-happened-while-writing-some.html">Heuristic Fencepost</a></p>
+
+<p>Suppose that you&#8217;ve just finished Graham Hutton&#8217;s solid <a href="http://www.cs.nott.ac.uk/~gmh/book.html">introduction</a> to Haskell and now want to take the language for a quick test drive. You decide to stick with something familiar; after noting that the Prelude doesn&#8217;t have an equivalent to Python&#8217;s <a href="http://docs.python.org/2/library/functions.html#range">range</a> function you decide to whip one up yourself. Haskell&#8217;s syntax is still a bit unfamiliar, however, so you decide to implement this function in a different &#8220;mostly functional&#8221; language that you have some experience with. You&#8217;ve been looking for a reason to dip your toes into Scheme again (and it seems to be a good fit here [1]) so you install <a href="http://dynamo.iro.umontreal.ca/wiki/index.php/Main_Page">Gambit Scheme</a> and <a href="http://www.call-cc.org">Chicken Scheme</a> and dig in.</p>
+
+<p>Perhaps you begin with a straightforward recursive definition in Scheme:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="k">define </span><span class="p">(</span><span class="nf">range</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)</span>
+</span><span class='line'> <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">start</span> <span class="nv">stop</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">cons </span><span class="nv">start</span> <span class="p">(</span><span class="nf">range</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">start</span> <span class="nv">step</span><span class="p">)</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">))</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">()))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This works well enough when start &lt; stop but fails completely when start > stop and step is a negative value (a use case supported by Python&#8217;s range()). To fix this problem we define two procedures via letrec and use whichever is appropriate based on the passed arguments:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="k">define </span><span class="p">(</span><span class="nf">newrange</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">letrec </span>
+</span><span class='line'>   <span class="p">((</span><span class="nf">upto</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">art</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">)</span>
+</span><span class='line'>     <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">art</span> <span class="nv">op</span><span class="p">)</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">cons </span><span class="nv">art</span> <span class="p">(</span><span class="nf">upto</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">art</span> <span class="nv">ep</span><span class="p">)</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">))</span>
+</span><span class='line'>      <span class="o">&#39;</span><span class="p">())))</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">downto</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">art</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">)</span>
+</span><span class='line'>     <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&gt; </span><span class="nv">art</span> <span class="nv">op</span><span class="p">)</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">cons </span><span class="nv">art</span> <span class="p">(</span><span class="nf">downto</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">art</span> <span class="nv">ep</span><span class="p">)</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">))</span>
+</span><span class='line'>      <span class="o">&#39;</span><span class="p">()))))</span>
+</span><span class='line'> <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">start</span> <span class="nv">stop</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">upto</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">downto</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">))))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This function now works for both start &lt; stop (with positive step) and start > stop (with negative step). There&#8217;s still a problem, though; if we change the sign of step in either of these cases we find ourselves in an infinite loop. Python&#8217;s range() returns an empty list in this case so we probably should too:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="k">define </span><span class="p">(</span><span class="nf">newerrange</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)</span>
+</span><span class='line'> <span class="p">(</span><span class="nf">letrec</span>
+</span><span class='line'>  <span class="p">((</span><span class="nf">upto</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">art</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">art</span> <span class="nv">op</span><span class="p">)</span>
+</span><span class='line'>     <span class="p">(</span><span class="nb">cons </span><span class="nv">art</span> <span class="p">(</span><span class="nf">upto</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">art</span> <span class="nv">ep</span><span class="p">)</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">))</span>
+</span><span class='line'>     <span class="o">&#39;</span><span class="p">())))</span>
+</span><span class='line'>   <span class="p">(</span><span class="nf">downto</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">art</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&gt; </span><span class="nv">art</span> <span class="nv">op</span><span class="p">)</span>
+</span><span class='line'>     <span class="p">(</span><span class="nb">cons </span><span class="nv">art</span> <span class="p">(</span><span class="nf">downto</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">art</span> <span class="nv">ep</span><span class="p">)</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">))</span>
+</span><span class='line'>     <span class="o">&#39;</span><span class="p">()))))</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">cond </span><span class="p">((</span><span class="k">and </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">start</span> <span class="nv">stop</span><span class="p">)</span> <span class="p">(</span><span class="nb">&lt; </span><span class="nv">step</span> <span class="mi">0</span><span class="p">))</span> <span class="o">&#39;</span><span class="p">())</span>
+</span><span class='line'>          <span class="p">((</span><span class="k">and </span><span class="p">(</span><span class="nb">&gt; </span><span class="nv">start</span> <span class="nv">stop</span><span class="p">)</span> <span class="p">(</span><span class="nb">&gt; </span><span class="nv">step</span> <span class="mi">0</span><span class="p">))</span> <span class="o">&#39;</span><span class="p">())</span>
+</span><span class='line'>          <span class="p">((</span><span class="nb">&lt; </span><span class="nv">start</span> <span class="nv">stop</span><span class="p">)</span> <span class="p">(</span><span class="nf">upto</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">))</span>
+</span><span class='line'>          <span class="p">(</span><span class="k">else </span><span class="p">(</span><span class="nf">downto</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)))))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>While working on these implementations you discover that SRFI-1 includes a function iota which looks similar to Python&#8217;s range(), although this function takes the number of elements in the return list rather than the start/stop/step values we&#8217;re looking for. Still, both Chicken Scheme and Gambit Scheme support SFRI-1 as extensions or modules and we should be able to whip up a thin wrapper around iota to get what we need. Of course we first need to figure out how to load up these modules. And after some initial experimentation we see some curious behaviour in the iota implementation on both platforms&#8230;</p>
+
+<p>But wait&#8230; weren&#8217;t we supposed to be writing some Haskell code?</p>
+
+<p>Oh, yeah.</p>
+
+<p>Haskell&#8217;s guarded equations allow for an easy expression of the same logic we were getting from cons in Scheme. We have no need to translate the recursive logic found in the Scheme version, however, since the list-related functions in the Prelude combined with a few sections gives us everything we need:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='haskell'><span class='line'><span class="nf">range</span> <span class="n">art</span> <span class="n">op</span> <span class="n">ep</span> <span class="o">|</span> <span class="n">art</span> <span class="o">&lt;</span> <span class="n">op</span> <span class="o">&amp;&amp;</span> <span class="n">ep</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">=</span> <span class="kt">[]</span>
+</span><span class='line'>                <span class="o">|</span> <span class="n">art</span> <span class="o">&gt;</span> <span class="n">op</span> <span class="o">&amp;&amp;</span> <span class="n">ep</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">=</span> <span class="kt">[]</span>
+</span><span class='line'>                <span class="o">|</span> <span class="n">art</span> <span class="o">&lt;</span> <span class="n">op</span> <span class="ow">=</span> <span class="n">takeWhile</span> <span class="p">(</span><span class="o">&lt;</span><span class="n">op</span><span class="p">)</span> <span class="p">(</span><span class="n">iterate</span> <span class="p">(</span><span class="o">+</span><span class="n">ep</span><span class="p">)</span> <span class="n">art</span><span class="p">)</span>
+</span><span class='line'>                <span class="o">|</span> <span class="n">art</span> <span class="o">&gt;</span> <span class="n">op</span> <span class="ow">=</span> <span class="n">takeWhile</span> <span class="p">(</span><span class="o">&gt;</span><span class="n">op</span><span class="p">)</span> <span class="p">(</span><span class="n">iterate</span> <span class="p">(</span><span class="o">+</span><span class="n">ep</span><span class="p">)</span> <span class="n">art</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>In all honesty this is a fairly elegant expression of the algorithm. And while there&#8217;s clearly a lot to like in Haskell this exercise has rekindled a long-dormant romance with Scheme rather than encouraging exploration of something new.</p>
+
+<p>[1] Yes, I realize Scheme isn&#8217;t &#8220;purely functional&#8221;. I&#8217;m not interested in taking a stand in this particular holy war, but there&#8217;s little doubt that Scheme&#8217;s bias against set! and it&#8217;s kin justify the &#8220;mostly functional&#8221; qualifier.</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Default arguments and implicit conversions in Scala]]></title>

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: haskell scheme | Absurdity and Farce]]></title>
+  <link href="http://absurdfarce.github.com/blog/categories/haskell-scheme/atom.xml" rel="self"/>
+  <link href="http://absurdfarce.github.com/"/>
+  <updated>2013-04-11T01:11:04-05:00</updated>
+  <id>http://absurdfarce.github.com/</id>
+  <author>
+    <name><![CDATA[Bret McGuire]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[A Funny Thing Happened While Writing Some Haskell....]]></title>
+    <link href="http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot/"/>
+    <updated>2010-12-20T12:00:00-06:00</updated>
+    <id>http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/12/funny-thing-happened-while-writing-some.html">Heuristic Fencepost</a></p>
+
+<p>Suppose that you've just finished Graham Hutton's solid <a href="http://www.cs.nott.ac.uk/~gmh/book.html">introduction</a> to Haskell and now want to take the language for a quick test drive. You decide to stick with something familiar; after noting that the Prelude doesn't have an equivalent to Python's <a href="http://docs.python.org/2/library/functions.html#range">range</a> function you decide to whip one up yourself. Haskell's syntax is still a bit unfamiliar, however, so you decide to implement this function in a different "mostly functional" language that you have some experience with. You've been looking for a reason to dip your toes into Scheme again (and it seems to be a good fit here [1]) so you install <a href="http://dynamo.iro.umontreal.ca/wiki/index.php/Main_Page">Gambit Scheme</a> and <a href="http://www.call-cc.org">Chicken Scheme</a> and dig in.</p>
+
+<p>Perhaps you begin with a straightforward recursive definition in Scheme:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="k">define </span><span class="p">(</span><span class="nf">range</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)</span>
+</span><span class='line'> <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nf">&amp;lt</span><span class="c1">; start stop)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">cons </span><span class="nv">start</span> <span class="p">(</span><span class="nf">range</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">start</span> <span class="nv">step</span><span class="p">)</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">))</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">()))</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>This works well enough when start &lt; stop but fails completely when start > stop and step is a negative value (a use case supported by Python's range()). To fix this problem we define two procedures via letrec and use whichever is appropriate based on the passed arguments:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="k">define </span><span class="p">(</span><span class="nf">newrange</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">letrec</span>
+</span><span class='line'>   <span class="p">((</span><span class="nf">upto</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">art</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">)</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;pre&gt;&lt;code&gt;</span> <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nf">&amp;lt</span><span class="c1">; art op)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">cons </span><span class="nv">art</span> <span class="p">(</span><span class="nf">upto</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">art</span> <span class="nv">ep</span><span class="p">)</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">))</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">())))</span>
+</span><span class='line'><span class="p">(</span><span class="nf">downto</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">art</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">)</span>
+</span><span class='line'> <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nf">&amp;gt</span><span class="c1">; art op)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">cons </span><span class="nv">art</span> <span class="p">(</span><span class="nf">downto</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">art</span> <span class="nv">ep</span><span class="p">)</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">))</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">()))))</span>
+</span><span class='line'><span class="nv">&lt;/code&gt;&lt;/pre&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span> <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nf">&amp;lt</span><span class="c1">; start stop)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">upto</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">downto</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">))))</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>This function now works for both start &lt; stop (with positive step) and start > stop (with negative step). There's still a problem, though; if we change the sign of step in either of these cases we find ourselves in an infinite loop. Python's range() returns an empty list in this case so we probably should too:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="k">define </span><span class="p">(</span><span class="nf">newerrange</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)</span>
+</span><span class='line'> <span class="p">(</span><span class="nf">letrec</span>
+</span><span class='line'>  <span class="p">((</span><span class="nf">upto</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">art</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">)</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;pre&gt;&lt;code&gt;</span><span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nf">&amp;lt</span><span class="c1">; art op)</span>
+</span><span class='line'> <span class="p">(</span><span class="nb">cons </span><span class="nv">art</span> <span class="p">(</span><span class="nf">upto</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">art</span> <span class="nv">ep</span><span class="p">)</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">))</span>
+</span><span class='line'> <span class="o">&#39;</span><span class="p">())))</span>
+</span><span class='line'><span class="nv">&lt;/code&gt;&lt;/pre&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span>   <span class="p">(</span><span class="nf">downto</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">art</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">)</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;pre&gt;&lt;code&gt;</span><span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nf">&amp;gt</span><span class="c1">; art op)</span>
+</span><span class='line'> <span class="p">(</span><span class="nb">cons </span><span class="nv">art</span> <span class="p">(</span><span class="nf">downto</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">art</span> <span class="nv">ep</span><span class="p">)</span> <span class="nv">op</span> <span class="nv">ep</span><span class="p">))</span>
+</span><span class='line'> <span class="o">&#39;</span><span class="p">()))))</span>
+</span><span class='line'><span class="p">(</span><span class="k">cond </span><span class="p">((</span><span class="k">and </span><span class="p">(</span><span class="nf">&amp;lt</span><span class="c1">; start stop) (&amp;lt; step 0)) &#39;())</span>
+</span><span class='line'>      <span class="p">((</span><span class="k">and </span><span class="p">(</span><span class="nf">&amp;gt</span><span class="c1">; start stop) (&amp;gt; step 0)) &#39;())</span>
+</span><span class='line'>      <span class="p">((</span><span class="nf">&amp;lt</span><span class="c1">; start stop) (upto start stop step))</span>
+</span><span class='line'>      <span class="p">(</span><span class="k">else </span><span class="p">(</span><span class="nf">downto</span> <span class="nv">start</span> <span class="nv">stop</span> <span class="nv">step</span><span class="p">)))))</span>
+</span><span class='line'><span class="nv">&lt;/code&gt;&lt;/pre&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>While working on these implementations you discover that SRFI-1 includes a function iota which looks similar to Python's range(), although this function takes the number of elements in the return list rather than the start/stop/step values we're looking for. Still, both Chicken Scheme and Gambit Scheme support SFRI-1 as extensions or modules and we should be able to whip up a thin wrapper around iota to get what we need. Of course we first need to figure out how to load up these modules. And after some initial experimentation we see some curious behaviour in the iota implementation on both platforms...</p>
+
+<p>But wait... weren't we supposed to be writing some Haskell code?</p>
+
+<p>Oh, yeah.</p>
+
+<p>Haskell's guarded equations allow for an easy expression of the same logic we were getting from cons in Scheme. We have no need to translate the recursive logic found in the Scheme version, however, since the list-related functions in the Prelude combined with a few sections gives us everything we need:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='haskell'><span class='line'><span class="nf">range</span> <span class="n">art</span> <span class="n">op</span> <span class="n">ep</span> <span class="o">|</span> <span class="n">art</span> <span class="o">&amp;</span><span class="n">lt</span><span class="p">;</span> <span class="n">op</span> <span class="o">&amp;</span><span class="n">amp</span><span class="p">;</span><span class="o">&amp;</span><span class="n">amp</span><span class="p">;</span> <span class="n">ep</span> <span class="o">&amp;</span><span class="n">lt</span><span class="p">;</span> <span class="mi">0</span> <span class="ow">=</span> <span class="kt">[]</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span>            <span class="o">|</span> <span class="n">art</span> <span class="o">&amp;</span><span class="n">gt</span><span class="p">;</span> <span class="n">op</span> <span class="o">&amp;</span><span class="n">amp</span><span class="p">;</span><span class="o">&amp;</span><span class="n">amp</span><span class="p">;</span> <span class="n">ep</span> <span class="o">&amp;</span><span class="n">gt</span><span class="p">;</span> <span class="mi">0</span> <span class="ow">=</span> <span class="kt">[]</span>
+</span><span class='line'>            <span class="o">|</span> <span class="n">art</span> <span class="o">&amp;</span><span class="n">lt</span><span class="p">;</span> <span class="n">op</span> <span class="ow">=</span> <span class="n">takeWhile</span> <span class="p">(</span><span class="o">&amp;</span><span class="n">lt</span><span class="p">;</span><span class="n">op</span><span class="p">)</span> <span class="p">(</span><span class="n">iterate</span> <span class="p">(</span><span class="o">+</span><span class="n">ep</span><span class="p">)</span> <span class="n">art</span><span class="p">)</span>
+</span><span class='line'>            <span class="o">|</span> <span class="n">art</span> <span class="o">&amp;</span><span class="n">gt</span><span class="p">;</span> <span class="n">op</span> <span class="ow">=</span> <span class="n">takeWhile</span> <span class="p">(</span><span class="o">&amp;</span><span class="n">gt</span><span class="p">;</span><span class="n">op</span><span class="p">)</span> <span class="p">(</span><span class="n">iterate</span> <span class="p">(</span><span class="o">+</span><span class="n">ep</span><span class="p">)</span> <span class="n">art</span><span class="p">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>In all honesty this is a fairly elegant expression of the algorithm. And while there's clearly a lot to like in Haskell this exercise has rekindled a long-dormant romance with Scheme rather than encouraging exploration of something new.</p>
+
+<p>[1] Yes, I realize Scheme isn't "purely functional". I'm not interested in taking a stand in this particular holy war, but there's little doubt that Scheme's bias against set! and it's kin justify the "mostly functional" qualifier.</p>
+]]></content>
+  </entry>
+  
+</feed>

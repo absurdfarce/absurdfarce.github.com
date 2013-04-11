@@ -1,0 +1,444 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Musings on List Comprehensions, Functional Programming and Python - Absurdity and Farce</title>
+  <meta name="author" content="Bret McGuire">
+
+  
+  <meta name="description" content="Originally published at Heuristic Fencepost For simplicity and elegance in your programming constructs the list comprehension is hard to beat. [1] A &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://absurdfarce.github.com/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="Absurdity and Farce" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/lib/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">Absurdity and Farce</a></h1>
+  
+    <h2>Searching for the sublime among the ridiculous</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:absurdfarce.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Musings on List Comprehensions, Functional Programming and Python</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-11-25T12:00:00-06:00" pubdate data-updated="true">Nov 25<span>th</span>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2011/11/musings-on-list-comprehensions.html">Heuristic Fencepost</a></p>
+
+<p>For simplicity and elegance in your programming constructs the <a href="http://en.wikipedia.org/wiki/List_comprehension">list comprehension</a> is hard to beat. [1] A list comprehension can filter an input list, transform it or do both, all in a single expression and with very readable syntax. At it&#8217;s best a list comprehension is &#8220;beautiful code&#8221; distilled: very clear and expressive with no unnecessary noise. You can, of course, make list comprehensions &#8220;ugly&#8221; but at least you have to try a bit to do so.</p>
+
+<p>List comprehensions have their roots in functional programming and several modern functional languages include support for them. We&#8217;ll see comprehensions in Haskell, Clojure and Scala. [2] Python also includes support for comprehensions; in fact the basis for <a href="http://www.artima.com/weblogs/viewpost.jsp?thread=98196">Guido&#8217;s argument</a> to remove the map and filter functions from py3k was that expressions using these functions could be easily re-written as comprehensions. We also consider comprehensions in Python, including differences between the Python implementation and those in other languages and what effect those differences may have.</p>
+
+<p>Let&#8217;s consider a fairly straightforward problem problem: given a list of (x,y) coordinates in some two-dimensional space provide a list of the coordinates that are within some fixed distance of the origin of (0,0). Our application also requires that results be displayed in <a href="http://en.wikipedia.org/wiki/Polar_coordinates">polar coordinates</a>, so for extra bonus points we should return our results in that notation. We can solve the problem quite easily in Haskell and Clojure using list comprehensions:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='haskell'><span class='line'><span class="nf">toDegrees</span> <span class="ow">::</span> <span class="kt">Floating</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</span><span class='line'><span class="nf">toDegrees</span> <span class="n">rad</span> <span class="ow">=</span> <span class="n">rad</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="n">pi</span>
+</span><span class='line'>
+</span><span class='line'><span class="nf">euclidean</span> <span class="ow">::</span> <span class="kt">Floating</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</span><span class='line'><span class="nf">euclidean</span> <span class="n">x</span> <span class="n">y</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">foo</span> <span class="ow">=</span> <span class="n">x</span> <span class="o">^^</span> <span class="mi">2</span>
+</span><span class='line'>                  <span class="n">bar</span> <span class="ow">=</span> <span class="n">y</span> <span class="o">^^</span> <span class="mi">2</span>
+</span><span class='line'>              <span class="kr">in</span> <span class="n">sqrt</span> <span class="p">(</span><span class="n">foo</span> <span class="o">+</span> <span class="n">bar</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+</span><span class='line'>     <span class="n">print</span> <span class="p">[(</span><span class="n">euclidean</span> <span class="n">x</span> <span class="n">y</span><span class="p">,(</span><span class="n">toDegrees</span> <span class="o">.</span> <span class="n">atan</span><span class="p">)</span> <span class="p">(</span><span class="n">y</span> <span class="o">/</span> <span class="n">x</span><span class="p">))</span><span class="o">|</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span><span class="ow">&lt;-</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)],(</span><span class="n">euclidean</span> <span class="n">x</span> <span class="n">y</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">euclidean</span> <span class="p">[</span><span class="nv">x</span> <span class="nv">y</span><span class="p">]</span> <span class="p">(</span><span class="nf">Math/sqrt</span> <span class="p">(</span><span class="nb">+ </span><span class="p">(</span><span class="nf">Math/pow</span> <span class="nv">x</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="nf">Math/pow</span> <span class="nv">y</span> <span class="mi">2</span><span class="p">))))</span>
+</span><span class='line'><span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nb">for </span><span class="p">[</span>
+</span><span class='line'>    <span class="p">[</span><span class="nv">x</span>,<span class="nv">y</span><span class="p">]</span>
+</span><span class='line'>     <span class="p">[[</span><span class="mi">1</span>,<span class="mi">2</span><span class="p">]</span>,<span class="p">[</span><span class="mi">2</span>,<span class="mi">3</span><span class="p">]</span>,<span class="p">[</span><span class="mi">3</span>,<span class="mi">4</span><span class="p">]]</span>
+</span><span class='line'>      <span class="ss">:when</span> <span class="p">(</span><span class="nb">&gt; </span><span class="p">(</span><span class="nf">euclidean</span> <span class="nv">x</span> <span class="nv">y</span><span class="p">)</span> <span class="mf">3.0</span><span class="p">)]</span>
+</span><span class='line'>       <span class="p">[(</span><span class="nf">euclidean</span> <span class="nv">x</span> <span class="nv">y</span><span class="p">)</span>,<span class="p">(</span><span class="nf">Math/toDegrees</span> <span class="p">(</span><span class="nf">Math/atan</span> <span class="p">(</span><span class="nb">/ </span><span class="nv">y</span> <span class="nv">x</span><span class="p">)))]))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>In Scala we use for expressions to accomplish something very similar:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">import</span> <span class="nn">scala.math.</span><span class="o">{</span><span class="n">atan</span><span class="o">,</span><span class="n">pow</span><span class="o">,</span><span class="n">sqrt</span><span class="o">,</span><span class="n">toDegrees</span><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">val</span> <span class="n">result</span> <span class="k">=</span>
+</span><span class='line'>  <span class="k">for</span> <span class="o">{</span>
+</span><span class='line'>    <span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="n">y</span><span class="o">)</span> <span class="k">&lt;-</span> <span class="nc">List</span><span class="o">((</span><span class="mi">1</span><span class="o">,</span><span class="mi">2</span><span class="o">),(</span><span class="mi">2</span><span class="o">,</span><span class="mi">3</span><span class="o">),(</span><span class="mi">3</span><span class="o">,</span><span class="mi">4</span><span class="o">))</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">sqrt</span><span class="o">((</span><span class="n">pow</span><span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="mi">2</span><span class="o">))</span> <span class="o">+</span> <span class="o">(</span><span class="n">pow</span><span class="o">(</span><span class="n">y</span><span class="o">,</span><span class="mi">2</span><span class="o">)))</span> <span class="o">&gt;</span> <span class="mf">3.0</span> <span class="o">}</span>
+</span><span class='line'>  <span class="k">yield</span> <span class="o">(</span><span class="n">sqrt</span><span class="o">((</span><span class="n">pow</span><span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="mi">2</span><span class="o">))</span> <span class="o">+</span> <span class="o">(</span><span class="n">pow</span><span class="o">(</span><span class="n">y</span><span class="o">,</span><span class="mi">2</span><span class="o">))),</span><span class="n">toDegrees</span><span class="o">(</span><span class="n">atan</span><span class="o">(</span><span class="n">y</span><span class="o">.</span><span class="n">toFloat</span><span class="o">/</span><span class="n">x</span><span class="o">)))</span>
+</span><span class='line'><span class="n">println</span><span class="o">(</span><span class="n">result</span><span class="o">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>And finally, a straightforward solution in Python:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">atan</span><span class="p">,</span> <span class="n">degrees</span>
+</span><span class='line'><span class="n">data</span><span class="o">=</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)]</span>
+</span><span class='line'><span class="k">print</span> <span class="p">[(</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span><span class="n">degrees</span><span class="p">(</span><span class="n">atan</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">/</span><span class="n">x</span><span class="p">)))</span> <span class="k">for</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="n">data</span> <span class="k">if</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Note that in each of these solutions we&#8217;re doing a bit more work than we need to. Our implementation computes the distance from the origin twice, once when filtering values and again when generating the final output of the transformation process. This seems unnecessary; a better option would be to somehow define this value as intermediate state. This state could then be available to both filter and transform expressions. Haskell and Clojure support the introduction of intermediate bindings in their comprehension syntax:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+</pre></td><td class='code'><pre><code class='haskell'><span class='line'><span class="nf">toDegrees</span> <span class="ow">::</span> <span class="kt">Floating</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</span><span class='line'><span class="nf">toDegrees</span> <span class="n">rad</span> <span class="ow">=</span> <span class="n">rad</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="n">pi</span>
+</span><span class='line'>
+</span><span class='line'><span class="nf">euclidean</span> <span class="ow">::</span> <span class="kt">Floating</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</span><span class='line'><span class="nf">euclidean</span> <span class="n">x</span> <span class="n">y</span> <span class="ow">=</span> <span class="kr">let</span> <span class="n">foo</span> <span class="ow">=</span> <span class="n">x</span> <span class="o">^^</span> <span class="mi">2</span>
+</span><span class='line'>                  <span class="n">bar</span> <span class="ow">=</span> <span class="n">y</span> <span class="o">^^</span> <span class="mi">2</span>
+</span><span class='line'>              <span class="kr">in</span> <span class="n">sqrt</span> <span class="p">(</span><span class="n">foo</span> <span class="o">+</span> <span class="n">bar</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="nf">main</span> <span class="ow">=</span> <span class="kr">do</span>
+</span><span class='line'>     <span class="n">print</span> <span class="p">[(</span><span class="n">dist</span><span class="p">,(</span><span class="n">toDegrees</span> <span class="o">.</span> <span class="n">atan</span><span class="p">)</span> <span class="p">(</span><span class="n">y</span> <span class="o">/</span> <span class="n">x</span><span class="p">))</span><span class="o">|</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span><span class="ow">&lt;-</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)],</span><span class="kr">let</span> <span class="n">dist</span><span class="ow">=</span><span class="n">euclidean</span> <span class="n">x</span> <span class="n">y</span><span class="p">,</span><span class="n">dist</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">euclidean</span> <span class="p">[</span><span class="nv">x</span> <span class="nv">y</span><span class="p">]</span> <span class="p">(</span><span class="nf">Math/sqrt</span> <span class="p">(</span><span class="nb">+ </span><span class="p">(</span><span class="nf">Math/pow</span> <span class="nv">x</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="nf">Math/pow</span> <span class="nv">y</span> <span class="mi">2</span><span class="p">))))</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nb">for </span><span class="p">[</span>
+</span><span class='line'>    <span class="p">[</span><span class="nv">x</span>,<span class="nv">y</span><span class="p">]</span>
+</span><span class='line'>     <span class="p">[[</span><span class="mi">1</span>,<span class="mi">2</span><span class="p">]</span>,<span class="p">[</span><span class="mi">2</span>,<span class="mi">3</span><span class="p">]</span>,<span class="p">[</span><span class="mi">3</span>,<span class="mi">4</span><span class="p">]]</span>
+</span><span class='line'>      <span class="ss">:let</span> <span class="p">[</span><span class="nv">dist</span> <span class="p">(</span><span class="nf">euclidean</span> <span class="nv">x</span> <span class="nv">y</span><span class="p">)]</span>
+</span><span class='line'>       <span class="ss">:when</span> <span class="p">(</span><span class="nb">&gt; </span><span class="nv">dist</span> <span class="mf">3.0</span><span class="p">)]</span>
+</span><span class='line'>        <span class="p">[</span><span class="nv">dist</span>,<span class="p">(</span><span class="nf">Math/toDegrees</span> <span class="p">(</span><span class="nf">Math/atan</span> <span class="p">(</span><span class="nb">/ </span><span class="nv">y</span> <span class="nv">x</span><span class="p">)))]))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Scala also allows for intermediate bindings within a for expression:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">import</span> <span class="nn">scala.math.</span><span class="o">{</span><span class="n">atan</span><span class="o">,</span><span class="n">pow</span><span class="o">,</span><span class="n">sqrt</span><span class="o">,</span><span class="n">toDegrees</span><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">val</span> <span class="n">result</span> <span class="k">=</span>
+</span><span class='line'>  <span class="k">for</span> <span class="o">{</span>
+</span><span class='line'>    <span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="n">y</span><span class="o">)</span> <span class="k">&lt;-</span> <span class="nc">List</span><span class="o">((</span><span class="mi">1</span><span class="o">,</span><span class="mi">2</span><span class="o">),(</span><span class="mi">2</span><span class="o">,</span><span class="mi">3</span><span class="o">),(</span><span class="mi">3</span><span class="o">,</span><span class="mi">4</span><span class="o">))</span>
+</span><span class='line'>    <span class="n">dist</span> <span class="k">=</span> <span class="n">sqrt</span><span class="o">((</span><span class="n">pow</span><span class="o">(</span><span class="n">x</span><span class="o">,</span><span class="mi">2</span><span class="o">))</span> <span class="o">+</span> <span class="o">(</span><span class="n">pow</span><span class="o">(</span><span class="n">y</span><span class="o">,</span><span class="mi">2</span><span class="o">)))</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">dist</span> <span class="o">&gt;</span> <span class="mf">3.0</span> <span class="o">}</span>
+</span><span class='line'>  <span class="k">yield</span> <span class="o">(</span><span class="n">dist</span><span class="o">,</span><span class="n">toDegrees</span><span class="o">(</span><span class="n">atan</span><span class="o">(</span><span class="n">y</span><span class="o">.</span><span class="n">toFloat</span><span class="o">/</span><span class="n">x</span><span class="o">)))</span>
+</span><span class='line'><span class="n">println</span><span class="o">(</span><span class="n">result</span><span class="o">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>What about Python? It turns out we cannot solve this problem in Python using a single comprehension; the syntax doesn&#8217;t allow for the introduction of intermediate state which can be used in either the predicate or transform expression. On the face of it this seems a bit odd; the language encourages the use of comprehensions for filtering and/or transformation while providing a less robust version of that very construct. To some degree this discrepancy reflects differing language goals. Guido&#8217;s post on the history of list comprehensions seems to indicate that the motivation for adding these features was pragmatic; the syntax is an elegant way to express most filter and transform operations. Functional languages use list comprehensions as &#8220;syntactic sugar&#8221; for monadic effects [3] that don&#8217;t really have an equivalent in standard Python usage. The syntax may look the same, but if you&#8217;re coming from a functional perspective they can feel just a bit off. The same is true for a few other common functional idioms:</p>
+
+<ul>
+<li>Lazy evaluation - List comprehensions in Python are not lazily evaluated. Generator expressions, which look very similar to list comprehensions, are lazily evaluated.</li>
+<li>Higher-order functions - Anonymous functions are supported in Python but these functions are famously limited to a single expression. Functions can return functions but for non-trivial functions a named function must be declared and returned.</li>
+</ul>
+
+
+<p>A couple things should be noted here. First, let us clearly state that Python is not and does not claim to be a functional programming language. While absolutely true, this fact doesn&#8217;t change the underlying point. Moving from functional concepts back into Python can be a bit jarring; some things look similar but don&#8217;t behave quite like you&#8217;d expect.</p>
+
+<p>It&#8217;s also worth noting that the inability to solve this problem with list comprehensions in Python doesn&#8217;t mean that this problem cannot be solved in idiomatic Python. We wish to return our intermediate state as well as filter results based on it&#8217;s value; this dual use allows us to solve the problem with nested comprehensions. The inner comprehension will generate the final representation (including the intermediate state) and the outer comprehension will filter results based on that representation. In Python this looks something like:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">atan</span><span class="p">,</span> <span class="n">degrees</span>
+</span><span class='line'><span class="n">data</span><span class="o">=</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)]</span>
+</span><span class='line'><span class="k">print</span> <span class="p">[(</span><span class="n">dist</span><span class="p">,</span><span class="n">degrees</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">dist</span><span class="p">,</span><span class="n">degrees</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[(</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span><span class="n">degrees</span><span class="p">(</span><span class="n">atan</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">/</span><span class="n">x</span><span class="p">)))</span> <span class="k">for</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span> <span class="k">if</span> <span class="n">dist</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">]</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This works only because the intermediate state is also returned in the final result. If that state were not explicitly returned (i.e. if it&#8217;s values were used as input to a conditional expression which returned, say, a string value describing the distance) this solution would not apply.</p>
+
+<p>We can also solve this problem using generators. Using the state maintained by the generator we can iterate through the list, compute the intermediate state and yield a value only when we&#8217;ve satisfied our predicate. A generator-based solution would look something like:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">atan</span><span class="p">,</span> <span class="n">degrees</span>
+</span><span class='line'><span class="n">data</span><span class="o">=</span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">),(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)]</span>
+</span><span class='line'><span class="k">def</span> <span class="nf">somefunc</span><span class="p">(</span><span class="n">alist</span><span class="p">):</span>
+</span><span class='line'>    <span class="k">for</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="n">alist</span><span class="p">:</span>
+</span><span class='line'>    <span class="n">dist</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">dist</span> <span class="o">&gt;</span> <span class="mf">3.0</span><span class="p">):</span>
+</span><span class='line'>            <span class="k">yield</span> <span class="p">(</span><span class="n">dist</span><span class="p">,</span><span class="n">degrees</span><span class="p">(</span><span class="n">atan</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">/</span><span class="n">x</span><span class="p">)))</span>
+</span><span class='line'><span class="k">print</span> <span class="nb">list</span><span class="p">(</span><span class="n">somefunc</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Finally, none of these comments should be construed as a criticism of Python, the design choices that went into the language or the inclusion of list comprehensions generally. The pragmatic case for inclusion of this feature seems very strong. This post is interested only in the interplay between these features and similar features in other languages.</p>
+
+<p>[1] Some languages (perhaps most notably Scala) use the term &#8220;for comprehension&#8221; or &#8220;for expression&#8221;, and in some of these languages (Scala again) these constructs are more flexible than a list comprehension. That said, it&#8217;s fairly straightforward to make Scala&#8217;s for expressions behave like conventional list comprehensions.</p>
+
+<p>[2] A purist might object that Scala is designed to mix features of object-oriented and functional languages, but the bias in favor of functional constructs justifies Scala&#8217;s inclusion here.</p>
+
+<p>[3] As an example, note that in Haskell list comprehensions can be replaced with do-notation. See the Haskell wiki for details.</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Bret McGuire</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-11-25T12:00:00-06:00" pubdate data-updated="true">Nov 25<span>th</span>, 2011</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/list-comprehension-functional-programming-python-haskell-clojure-scala/'>list_comprehension functional_programming python haskell clojure scala</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://absurdfarce.github.com/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/" data-via="absurdfarce" data-counturl="http://absurdfarce.github.com/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot/" title="Previous Post: A Funny Thing Happened While Writing Some Haskell....">&laquo; A Funny Thing Happened While Writing Some Haskell....</a>
+      
+      
+        <a class="basic-alignment right" href="/blog/2012/07/10/ruby-perl-and-eloquence/" title="Next Post: Ruby, Perl and Eloquence">Ruby, Perl and Eloquence &raquo;</a>
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2012/07/10/ruby-perl-and-eloquence/">Ruby, Perl and Eloquence</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/">Musings on List Comprehensions, Functional Programming and Python</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot/">A Funny Thing Happened While Writing Some Haskell....</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala/">Default arguments and implicit conversions in Scala</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2010/08/23/learning-scala-from-dead-swiss-mathematicians-return-of-palindromes/">Learning Scala from Dead Swiss Mathematicians : Return of Palindromes</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/absurdfarce">@absurdfarce</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'absurdfarce',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2013 - Bret McGuire -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,437 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Ruby, Perl and Eloquence - Absurdity and Farce</title>
+  <meta name="author" content="Bret McGuire">
+
+  
+  <meta name="description" content="Originally published at Heuristic Fencepost In an attempt to make my Ruby code a bit more idiomatic I&#8217;ve been spending a bit of time recently &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://absurdfarce.github.com/blog/2012/07/10/ruby-perl-and-eloquence">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="Absurdity and Farce" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/lib/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">Absurdity and Farce</a></h1>
+  
+    <h2>Searching for the sublime among the ridiculous</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:absurdfarce.github.com" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Ruby, Perl and Eloquence</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-10T12:00:00-05:00" pubdate data-updated="true">Jul 10<span>th</span>, 2012</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2012/07/ruby-perl-and-eloquence.html">Heuristic Fencepost</a></p>
+
+<p>In an attempt to make my Ruby code a bit more idiomatic I&#8217;ve been spending a bit of time recently with Russ Olsen&#8217;s excellent <a href="http://eloquentruby.com">Eloquent Ruby</a>. There are many reasons to love writing Ruby code, not least of which is that Ruby deploys the same terse but expressive power of Perl while employing better overall principles of programming. The effect isn&#8217;t universal; on occasion my problems with Ruby look quite a bit like my problems with Perl. Given the overall elegance of the language it seems likely that there&#8217;s a &#8220;better&#8221; (or at least more idiomatic) way to accomplish my goal. And so I turn to <em>Eloquent Ruby</em>.</p>
+
+<p>As an example of this tension consider the following example.</p>
+
+<p>Perl has a well-deserved reputation for efficiently processing text files with regular expressions. We&#8217;ll consider an example from another text I&#8217;ve been spending a bit of time with: Hofstadter&#8217;s seminal <a href="http://en.wikipedia.org/wiki/G%C3%B6del,_Escher,_Bach">Godel, Escher, Bach</a>. A simple implementation of the productions of the MIU system in Perl [1] might look like the following:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='perl'><span class='line'><span class="c1"># Simple implementation of the productions for the MIU system</span>
+</span><span class='line'><span class="nb">open</span> <span class="n">INFILE</span><span class="p">,</span><span class="s">&quot;&lt;&quot;</span><span class="p">,</span><span class="nv">$ARGV</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+</span><span class='line'><span class="k">while</span><span class="p">(</span><span class="sr">&lt;INFILE&gt;</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="nb">chomp</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">next</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /#.*/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$1IU\n&quot;</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.+?)I$/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;M$1$1\n&quot;</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^M(.+)$/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$1U$2\n&quot;</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.*)III(.*)$/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$1$2\n&quot;</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.*)UU(.*)$/</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Reasonable enough, but there&#8217;s a lot of magic going on here. We&#8217;re relying on the &#8220;magic&#8221; variable $_ to access the current line, and to make things worse we have to obtain those lines using the INFILE identifier that only has meaning due to a side effect of the open() call [2]. There&#8217;s also those &#8220;magic&#8221; $1 and $2 variables for accessing capture groups in a regex.</p>
+
+<p>The Ruby version is both slightly shorter and a bit cleaner:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># Simple implementation of the productions for the MIU system</span>
+</span><span class='line'><span class="no">File</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="no">ARGV</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span><span class="p">)</span><span class="o">.</span><span class="n">readlines</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">line</span> <span class="o">|</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">next</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/#.*/</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="vg">$1</span><span class="si">}</span><span class="s2">IU</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/^(.+)I$/</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;M</span><span class="si">#{</span><span class="vg">$1</span><span class="si">}#{</span><span class="vg">$1</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/^M(.+)$/</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="vg">$1</span><span class="si">}</span><span class="s2">U</span><span class="si">#{</span><span class="vg">$2</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/^(.*)III(.*)$/</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="vg">$1</span><span class="si">}#{</span><span class="vg">$2</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/^(.*)UU(.*)$/</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>We&#8217;ve made some nice strides here. The use of File.new() allows us to avoid open() and it&#8217;s side effects. The use of a code block allows us to remove the global $_ in favor of a scoped variable line.</p>
+
+<p>But we&#8217;re still stuck with $1 and $2 for those capture groups.</p>
+
+<p>One can imagine an elegant object-oriented solution based on match objects. Any such implementation would have to accomplish three things:</p>
+
+<ul>
+<li>The match object will be used as the condition of an if/unless expression so nil should be returned if there&#8217;s no match</li>
+<li>The match object should be bound to a variable name in scope</li>
+<li>References to capture groups in the if-clause should use the scoped variable rather than the $1,$2, etc.</li>
+</ul>
+
+
+<p>But remember, this exercise is only useful if we don&#8217;t have to compromise on elegance. If all we&#8217;re after is an explicit object-oriented solution we could go with the Python version:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="c"># Simple implementation of the productions for the MIU system</span>
+</span><span class='line'><span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">argv</span>
+</span><span class='line'><span class="kn">import</span> <span class="nn">re</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">re_c</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;#.*&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">re1</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;^(.+?)I$&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">re2</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;^M(.+)$&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">re3</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;^(.*)III(.*)$&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">re4</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&quot;^(.*)UU(.*)$&quot;</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">])]:</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">re_c</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+</span><span class='line'>        <span class="k">continue</span>
+</span><span class='line'>    <span class="n">m1</span> <span class="o">=</span> <span class="n">re1</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">m1</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">print</span> <span class="n">m1</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;IU&quot;</span>
+</span><span class='line'>    <span class="n">m2</span> <span class="o">=</span> <span class="n">re2</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">m2</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">print</span> <span class="s">&quot;M&quot;</span> <span class="o">+</span> <span class="n">m2</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">m2</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">m3</span> <span class="o">=</span> <span class="n">re3</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">m3</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">print</span> <span class="n">m3</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;U&quot;</span> <span class="o">+</span> <span class="n">m3</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">m4</span> <span class="o">=</span> <span class="n">re4</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">m4</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">print</span> <span class="n">m4</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">m4</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>That&#8217;s probably not what we want. [3]</p>
+
+<p>After pondering this question for a bit we realize we may not be in such a bad spot. /regex/.match(str) already returns nil if there is no match so our first requirement is satisfied. Assignment is just another expression, so our match object (or nil) will be returned to the if-expression test, helping us with our second goal. And match objects provide access to capture groups using []. So long as the assigned variable is in scope we should have everything we need. A bit of scuffling [4] brings us to the following:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="c1"># Implementation of the productions for the MIU system with match objects</span>
+</span><span class='line'><span class="no">File</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="no">ARGV</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span><span class="p">)</span><span class="o">.</span><span class="n">readlines</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">line</span> <span class="o">|</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">next</span> <span class="k">if</span> <span class="n">line</span> <span class="o">=~</span> <span class="sr">/#.*/</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">foo</span> <span class="o">=</span> <span class="kp">nil</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}</span><span class="s2">IU</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">foo</span> <span class="o">=</span> <span class="sr">/^(.+)I$/</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;M</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">foo</span> <span class="o">=</span> <span class="sr">/^M(.+)$/</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}</span><span class="s2">U</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">2</span><span class="o">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">foo</span> <span class="o">=</span> <span class="sr">/^(.*)III(.*)$/</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span><span class="si">}#{</span><span class="n">foo</span><span class="o">[</span><span class="mi">2</span><span class="o">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">foo</span> <span class="o">=</span> <span class="sr">/^(.*)UU(.*)$/</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This example is free of any &#8220;magic&#8221; variables, although we have sacrificed a bit on the clarity front. It&#8217;s also worth noting that we could have accomplished something very similar in Perl:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='perl'><span class='line'><span class="c1"># Implementation of the productions for the MIU system with match objects</span>
+</span><span class='line'><span class="nb">open</span> <span class="n">INFILE</span><span class="p">,</span><span class="s">&quot;&lt;&quot;</span><span class="p">,</span><span class="nv">$ARGV</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+</span><span class='line'><span class="k">while</span><span class="p">(</span><span class="sr">&lt;INFILE&gt;</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="nb">chomp</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">next</span> <span class="k">if</span> <span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /#.*/</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$foo[0]IU\n&quot;</span> <span class="k">if</span> <span class="p">(</span><span class="nv">@foo</span> <span class="o">=</span> <span class="p">(</span><span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.+?)I$/</span><span class="p">));</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;M$foo[0]$foo[0]\n&quot;</span> <span class="k">if</span> <span class="p">(</span><span class="nv">@foo</span> <span class="o">=</span> <span class="p">(</span><span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^M(.+)$/</span><span class="p">));</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$foo[0]U$foo[1]\n&quot;</span> <span class="k">if</span> <span class="p">(</span><span class="nv">@foo</span> <span class="o">=</span> <span class="p">(</span><span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.*)III(.*)$/</span><span class="p">));</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;$foo[0]$foo[1]\n&quot;</span> <span class="k">if</span> <span class="p">(</span><span class="nv">@foo</span> <span class="o">=</span> <span class="p">(</span><span class="nv">$_</span> <span class="o">=~</span><span class="sr"> /^(.*)UU(.*)$/</span><span class="p">));</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This implementation is hardly idiomatic. It&#8217;s also quite a bit less clear than our earlier efforts in the language.</p>
+
+<p>Where does this leave us? Do we keep in touch with our Perl roots and live with $1 in order to keep things terse and expressive? Do we sacrifice a bit of clarity and go with an object-oriented approach? Or do we do something else entirely?</p>
+
+<p>Answers to this question (and others like it) are what I&#8217;m hoping to get out of <em>Eloquent Ruby</em>.</p>
+
+<p>[1] We&#8217;re ignoring nasty things like error handling and complex edge cases in order to keep the conversation focused.</p>
+
+<p>[2] We could use lexical file handles here but that doesn&#8217;t really change the underlying point. Even in that case we still have to call open() in order for $fh to be useful.</p>
+
+<p>[3] Python does a lot of things very, very well, but this solution to this problem seems unnecessarily verbose.</p>
+
+<p>[4] The requirement to declare foo in advance when using the modifier form of if was a bit surprising. Shifting to an if expression removed this requirement; in that case assignment in the condition. The upcoming Perl version also didn&#8217;t require this advance declaration when using an equivalent to the modifier form. An MRI quirk, perhaps?</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Bret McGuire</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-07-10T12:00:00-05:00" pubdate data-updated="true">Jul 10<span>th</span>, 2012</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/ruby/'>ruby</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://absurdfarce.github.com/blog/2012/07/10/ruby-perl-and-eloquence/" data-via="absurdfarce" data-counturl="http://absurdfarce.github.com/blog/2012/07/10/ruby-perl-and-eloquence/" >Tweet</a>
+  
+  
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/" title="Previous Post: Musings on List Comprehensions, Functional Programming and Python">&laquo; Musings on List Comprehensions, Functional Programming and Python</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2012/07/10/ruby-perl-and-eloquence/">Ruby, Perl and Eloquence</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/">Musings on List Comprehensions, Functional Programming and Python</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot/">A Funny Thing Happened While Writing Some Haskell....</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala/">Default arguments and implicit conversions in Scala</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2010/08/23/learning-scala-from-dead-swiss-mathematicians-return-of-palindromes/">Learning Scala from Dead Swiss Mathematicians : Return of Palindromes</a>
+      </li>
+    
+  </ul>
+</section>
+
+<section>
+  <h1>GitHub Repos</h1>
+  <ul id="gh_repos">
+    <li class="loading">Status updating...</li>
+  </ul>
+  
+  <a href="https://github.com/absurdfarce">@absurdfarce</a> on GitHub
+  
+  <script type="text/javascript">
+    $(document).ready(function(){
+        if (!window.jXHR){
+            var jxhr = document.createElement('script');
+            jxhr.type = 'text/javascript';
+            jxhr.src = '/javascripts/libs/jXHR.js';
+            var s = document.getElementsByTagName('script')[0];
+            s.parentNode.insertBefore(jxhr, s);
+        }
+
+        github.showRepos({
+            user: 'absurdfarce',
+            count: 0,
+            skip_forks: true,
+            target: '#gh_repos'
+        });
+    });
+  </script>
+  <script src="/javascripts/github.js" type="text/javascript"> </script>
+</section>
+
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2013 - Bret McGuire -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+
+
+
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>
