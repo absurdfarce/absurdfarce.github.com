@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: scala | Absurdity and Farce]]></title>
+  <link href="http://absurdfarce.github.com/blog/categories/scala/atom.xml" rel="self"/>
+  <link href="http://absurdfarce.github.com/"/>
+  <updated>2013-04-10T23:37:06-05:00</updated>
+  <id>http://absurdfarce.github.com/</id>
+  <author>
+    <name><![CDATA[Bret McGuire]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Default arguments and implicit conversions in Scala]]></title>
+    <link href="http://absurdfarce.github.com/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala/"/>
+    <updated>2010-10-10T12:00:00-05:00</updated>
+    <id>http://absurdfarce.github.com/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/10/default-arguments-and-implicit.html">Heuristic Fencepost</a></p>
+
+<p>In a <a href="blog/2010/08/23/learning-scala-from-dead-swiss-mathematicians-return-of-palindromes/">previous post</a> we went in search of an implicit conversion from Int to List[Int] such that each member of the list corresponds to the value at an equivalent position in the input Int (i.e. 987 = List(9,8,7)). At the time we mentioned that a properly tail recursive implementation proved to be a bit more complicated than one might expect. In this post we'll examine these problems in some detail.</p>
+
+<p>A properly tail recursive implementation of this conversion function makes use of an accumulator array to store state as we recurse.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">package</span> <span class="nn">org.fencepost.defaults</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">org.scalatest.Suite</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">class</span> <span class="nc">ImplicitDefaultTest1</span> <span class="k">extends</span> <span class="nc">Suite</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">def</span> <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">,</span> <span class="n">acc</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">val</span> <span class="n">newmember</span> <span class="k">=</span> <span class="n">arg</span> <span class="o">%</span> <span class="mi">10</span>
+</span><span class='line'><span class="k">if</span> <span class="o">(</span><span class="n">arg</span> <span class="o">&amp;</span><span class="n">lt</span><span class="o">;</span><span class="k">=</span> <span class="mi">9</span><span class="o">)</span>
+</span><span class='line'>  <span class="nc">List</span><span class="o">(</span><span class="n">newmember</span><span class="o">)</span> <span class="o">:::</span> <span class="n">acc</span>
+</span><span class='line'><span class="k">else</span>
+</span><span class='line'>  <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span> <span class="o">/</span> <span class="mi">10</span><span class="o">,</span><span class="nc">List</span><span class="o">(</span><span class="n">newmember</span><span class="o">)</span> <span class="o">:::</span> <span class="n">acc</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">toList</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span><span class="o">,</span><span class="nc">List</span><span class="o">())&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">def</span> <span class="n">testImplicit</span><span class="o">()</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="n">assert</span><span class="o">(</span><span class="mf">0.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">0</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">5.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">5</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">12345.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">2</span><span class="o">)</span> <span class="o">==</span> <span class="mi">3</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">98765432.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">8</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">98765432</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>The test above passes so everything looks good so far. On a second look, however, we note that the wrapper function toList() is less than ideal. The accumulator needs to be initialized to the empty list in order for the function to work correctly but defining a second function just to pass in an extra arg looks like unnecessary cruft. Scala 2.8 introduced default arguments to address situations such as this; perhaps we can deploy default arguments here to clean up our test:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">package</span> <span class="nn">org.fencepost.defaults</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">org.scalatest.Suite</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">class</span> <span class="nc">ImplicitDefaultTest2</span> <span class="k">extends</span> <span class="nc">Suite</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">,</span> <span class="n">acc</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">List</span><span class="o">())</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">val</span> <span class="n">newmember</span> <span class="k">=</span> <span class="n">arg</span> <span class="o">%</span> <span class="mi">10</span>
+</span><span class='line'><span class="k">if</span> <span class="o">(</span><span class="n">arg</span> <span class="o">&amp;</span><span class="n">lt</span><span class="o">;</span><span class="k">=</span> <span class="mi">9</span><span class="o">)</span>
+</span><span class='line'>  <span class="nc">List</span><span class="o">(</span><span class="n">newmember</span><span class="o">)</span> <span class="o">:::</span> <span class="n">acc</span>
+</span><span class='line'><span class="k">else</span>
+</span><span class='line'>  <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span> <span class="o">/</span> <span class="mi">10</span><span class="o">,</span><span class="nc">List</span><span class="o">(</span><span class="n">newmember</span><span class="o">)</span> <span class="o">:::</span> <span class="n">acc</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">def</span> <span class="n">testImplicit</span><span class="o">()</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="n">assert</span><span class="o">(</span><span class="mf">0.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">0</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">5.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">5</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">12345.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">2</span><span class="o">)</span> <span class="o">==</span> <span class="mi">3</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">98765432.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">8</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">98765432</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>When we attempt to execute the test above we're greeted rather rudely by sbt:</p>
+
+<pre><code>[info] Compiling test sources...
+[error] .../src/test/scala/org/fencepost/defaults/ImplicitDefaultTest2.scala:21:
+ value length is not a member of Int
+[error]     assert(0.length == 1)
+[error]              ^
+[error] .../src/test/scala/org/fencepost/defaults/ImplicitDefaultTest2.scala:22:
+ 0 of type Int(0) does not take parameters
+[error]     assert(0(0) == 0)
+...
+</code></pre>
+
+<p>Clearly the implicit conversion of Int to List[Int] wasn't in play when this test was executed. But why not? Logically int2list(arg:Int, acc:List[Int] = List()) will convert Ints to List[Int] everywhere int2list(arg:Int, acc:List[Int]) does. We can demonstrate the validity of this claim by fooling the compiler using a variation on the front-end function we used before:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">package</span> <span class="nn">org.fencepost.defaults</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">org.scalatest.Suite</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">class</span> <span class="nc">ImplicitDefaultTest3</span> <span class="k">extends</span> <span class="nc">Suite</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">def</span> <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">,</span> <span class="n">acc</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="nc">List</span><span class="o">())</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">val</span> <span class="n">newmember</span> <span class="k">=</span> <span class="n">arg</span> <span class="o">%</span> <span class="mi">10</span>
+</span><span class='line'><span class="k">if</span> <span class="o">(</span><span class="n">arg</span> <span class="o">&amp;</span><span class="n">lt</span><span class="o">;</span><span class="k">=</span> <span class="mi">9</span><span class="o">)</span>
+</span><span class='line'>  <span class="nc">List</span><span class="o">(</span><span class="n">newmember</span><span class="o">)</span> <span class="o">:::</span> <span class="n">acc</span>
+</span><span class='line'><span class="k">else</span>
+</span><span class='line'>  <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span> <span class="o">/</span> <span class="mi">10</span><span class="o">,</span><span class="nc">List</span><span class="o">(</span><span class="n">newmember</span><span class="o">)</span> <span class="o">:::</span> <span class="n">acc</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">toList</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span> <span class="k">=</span> <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span><span class="o">)&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">def</span> <span class="n">testImplicit</span><span class="o">()</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="n">assert</span><span class="o">(</span><span class="mf">0.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">0</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">0</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">5.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">5</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">12345.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">0</span><span class="o">)</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">2</span><span class="o">)</span> <span class="o">==</span> <span class="mi">3</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">12345</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mf">98765432.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">8</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span><span class="o">(</span><span class="mi">98765432</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>As expected this test passes without issue.</p>
+
+<p>My suspicion is that this issue is a side effect of the fact that default arguments apparently aren't represented in the type system. It's not surprising that int2list(arg:Int, acc:List[Int]) isn't available as an implicit conversion; there's no way for the runtime to supply the required "acc" argument for an input Int instance. This is not true for int2list(arg:Int, acc:List[Int] = List()); in that case the default value of "acc" could be used to perform the translation. Note, however, that these two functions are represented by the same type in the Scala runtime:</p>
+
+<pre><code>$ scala
+Welcome to Scala version 2.8.0.final (OpenJDK Client VM, Java 1.6.0_18).
+Type in expressions to have them evaluated.
+Type :help for more information.
+
+scala&gt;   def int2list(arg:Int, acc:List[Int]):List[Int] = {
+...
+int2list: (arg: Int,acc: List[Int])List[Int]
+
+scala&gt;   def int2list2(arg:Int, acc:List[Int] = List()):List[Int] = {
+...
+int2list2: (arg: Int,acc: List[Int])List[Int]
+</code></pre>
+
+<p>If the type system is unaware that default arguments are available for all arguments other than the type to convert from then it's not at all surprising that a function would be excluded from the set of valid implicit conversion functions.</p>
+
+<p>Results tested and verified on both Scala 2.8.0 and 2.8.1 RC2.</p>
+]]></content>
+  </entry>
+  
+</feed>

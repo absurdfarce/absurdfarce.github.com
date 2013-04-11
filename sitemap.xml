@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>
+    <url>
+        <loc>
+            http://absurdfarce.github.com/blog/2010/07/26/learning-scala-from-dead-swiss-mathematicians-palindromes/
+        </loc>
+        <lastmod>2013-04-10T23:36:08-05:00</lastmod>
+    </url>
+    <url>
+        <loc>
+            http://absurdfarce.github.com/blog/2010/08/23/learning-scala-from-dead-swiss-mathematicians-return-of-palindromes/
+        </loc>
+        <lastmod>2013-04-10T23:36:08-05:00</lastmod>
+    </url>
+    <url>
+        <loc>
+            http://absurdfarce.github.com/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala/
+        </loc>
+        <lastmod>2013-04-10T23:36:08-05:00</lastmod>
+    </url>
+    <url>
+        <loc>http://absurdfarce.github.com/blog/archives/</loc>
+        <lastmod>2013-04-10T23:36:08-05:00</lastmod>
+    </url>
+    <url>
+        <loc>http://absurdfarce.github.com/robots.txt</loc>
+        <lastmod>2013-04-10T23:34:12-05:00</lastmod>
+    </url>
+    <url>
+        <loc>http://absurdfarce.github.com/</loc>
+        <lastmod>2013-04-10T23:36:08-05:00</lastmod>
+    </url>
+</urlset>

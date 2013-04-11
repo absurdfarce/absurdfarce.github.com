@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: 
+
+Sitemap: http://absurdfarce.github.com/sitemap.xml 

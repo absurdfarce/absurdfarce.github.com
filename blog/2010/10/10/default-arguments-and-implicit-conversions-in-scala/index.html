@@ -5,7 +5,7 @@
 <!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  <title>Absurdity and Farce</title>
+  <title>Default arguments and implicit conversions in Scala - Absurdity and Farce</title>
   <meta name="author" content="Bret McGuire">
 
   
@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   
-  <link rel="canonical" href="http://absurdfarce.github.com">
+  <link rel="canonical" href="http://absurdfarce.github.com/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala">
   <link href="/favicon.png" rel="icon">
   <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
   <link href="/atom.xml" rel="alternate" title="Absurdity and Farce" type="application/atom+xml">
@@ -63,15 +63,12 @@
 </nav>
   <div id="main">
     <div id="content">
-      <div class="blog-index">
+      <div>
+<article class="hentry" role="article">
   
-  
-  
-    <article>
-      
   <header>
     
-      <h1 class="entry-title"><a href="/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala/">Default Arguments and Implicit Conversions in Scala</a></h1>
+      <h1 class="entry-title">Default Arguments and Implicit Conversions in Scala</h1>
     
     
       <p class="meta">
@@ -94,7 +91,7 @@
   </header>
 
 
-  <div class="entry-content"><p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/10/default-arguments-and-implicit.html">Heuristic Fencepost</a></p>
+<div class="entry-content"><p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/10/default-arguments-and-implicit.html">Heuristic Fencepost</a></p>
 
 <p>In a <a href="blog/2010/08/23/learning-scala-from-dead-swiss-mathematicians-return-of-palindromes/">previous post</a> we went in search of an implicit conversion from Int to List[Int] such that each member of the list corresponds to the value at an equivalent position in the input Int (i.e. 987 = List(9,8,7)). At the time we mentioned that a properly tail recursive implementation proved to be a bit more complicated than one might expect. In this post we&#8217;ll examine these problems in some detail.</p>
 
@@ -330,170 +327,16 @@ int2list2: (arg: Int,acc: List[Int])List[Int]
 
 <p>Results tested and verified on both Scala 2.8.0 and 2.8.1 RC2.</p>
 </div>
-  
-  
 
 
-    </article>
-  
-  
-    <article>
+  <footer>
+    <p class="meta">
       
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/08/23/learning-scala-from-dead-swiss-mathematicians-return-of-palindromes/">Learning Scala From Dead Swiss Mathematicians : Return of Palindromes</a></h1>
-    
-    
-      <p class="meta">
-        
-
-
-
-
-
-
-
-
   
 
+<span class="byline author vcard">Posted by <span class="fn">Bret McGuire</span></span>
 
-<time datetime="2010-08-23T12:00:00-05:00" pubdate data-updated="true">Aug 23<span>rd</span>, 2010</time>
-        
-      </p>
-    
-  </header>
-
-
-  <div class="entry-content"><p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/08/learning-scala-from-dead-swiss.html">Heuristic Fencepost</a></p>
-
-<p>In a <a href="blog/2010/07/26/learning-scala-from-dead-swiss-mathematicians-palindromes/">recent post</a> we implemented a predicate to identify integers which were also palindromes. Our original implementation converted the input integer to a String in order to more easily access the leading digit, something that can&#8217;t easily be done with an input integer. But is this really the case?</p>
-
-<p>If we could easily convert Integers into a List[Integer] [1] we could then easily access the &#8220;head&#8221; and &#8220;tail&#8221; of this list for purposes of comparison. Ideally this conversion could be automated so that we don&#8217;t have to explicitly track these conversions. Fortunately Scala&#8217;s implicit conversions provide exactly these features. A simple implementation looks something like the following:</p>
-
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">implicit</span> <span class="k">def</span> <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span>
-</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">arg</span> <span class="o">&lt;=</span> <span class="mi">9</span><span class="o">)</span>
-</span><span class='line'>    <span class="nc">List</span><span class="o">(</span><span class="n">arg</span><span class="o">)</span>
-</span><span class='line'>  <span class="k">else</span>
-</span><span class='line'>    <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span> <span class="o">/</span> <span class="mi">10</span><span class="o">)</span> <span class="o">:::</span> <span class="nc">List</span><span class="o">(</span><span class="n">arg</span> <span class="o">%</span> <span class="mi">10</span><span class="o">)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>It&#8217;s worth taking a moment to point out a few things about this function:</p>
-
-<ul>
-<li>We&#8217;re assuming base 10 integers here. We could make the function more flexible by adding a parameter to specify the integers base if necessary</li>
-<li>A better implementation would be purely tail recursive, but this turns out to be a bit trickier than expected; more on that in a future post.</li>
-</ul>
-
-
-<p>With this conversion in place we can now define a properly tail recursive predicate to check for palindromes:</p>
-
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">byInt</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span><span class="k">:</span><span class="kt">Boolean</span> <span class="o">=</span> <span class="o">{</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">arg</span><span class="o">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">arg</span><span class="o">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
-</span><span class='line'>    <span class="k">return</span> <span class="kc">true</span>
-</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">arg</span><span class="o">.</span><span class="n">head</span> <span class="o">!=</span> <span class="n">arg</span><span class="o">.</span><span class="n">last</span><span class="o">)</span>
-</span><span class='line'>    <span class="kc">false</span>
-</span><span class='line'>  <span class="k">else</span>
-</span><span class='line'>    <span class="n">byInt</span><span class="o">(</span><span class="n">arg</span><span class="o">.</span><span class="n">slice</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span><span class="n">arg</span><span class="o">.</span><span class="n">length</span> <span class="o">-</span> <span class="mi">1</span><span class="o">))</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Very nice, but Scala&#8217;s pattern matching allows for an even better (by which we mean &#8220;simpler&#8221;) implementation that makes use of pattern guards:</p>
-
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">def</span> <span class="n">byIntMatch</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">])</span><span class="k">:</span><span class="kt">Boolean</span> <span class="o">=</span> <span class="o">{</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// Note that we don&#39;t need to check for lists of length </span>
-</span><span class='line'>  <span class="c1">// 0 or length 1 as we do in byInt above.  The first </span>
-</span><span class='line'>  <span class="c1">// two cases of our match operation below handle these </span>
-</span><span class='line'>  <span class="c1">// cases.</span>
-</span><span class='line'>  <span class="n">arg</span> <span class="k">match</span> <span class="o">{</span>
-</span><span class='line'>    <span class="k">case</span> <span class="nc">List</span><span class="o">()</span> <span class="k">=&gt;</span> <span class="kc">true</span>
-</span><span class='line'>    <span class="k">case</span> <span class="nc">List</span><span class="o">(</span><span class="k">_</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="kc">true</span>
-</span><span class='line'>    <span class="k">case</span> <span class="n">arghead</span> <span class="o">::</span> <span class="n">rest</span> <span class="k">if</span> <span class="n">arg</span><span class="o">.</span><span class="n">last</span> <span class="o">==</span> <span class="n">arghead</span> <span class="k">=&gt;</span> <span class="n">byIntMatch</span><span class="o">(</span><span class="n">rest</span><span class="o">.</span><span class="n">slice</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span><span class="n">rest</span><span class="o">.</span><span class="n">length</span> <span class="o">-</span> <span class="mi">1</span><span class="o">))</span>
-</span><span class='line'>    <span class="k">case</span> <span class="k">_</span> <span class="k">=&gt;</span> <span class="kc">false</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>The full implementation can be found at <a href="https://github.com/heuristicfencepost/euler">github</a>. Most of the code discussed here can be found in the org.fencepost.palindrome package; a full solution to Problem 4 using this code is also included.</p>
-
-<p>[1] We use integers here only as a matter of convenience; of course we really only need a Byte as long as we&#8217;re talking about base 256 or less. We can always optimize for space later if needed.</p>
-
-<p>UPDATE - Shortly after completing this post I began another chapter in the &#8220;stairway&#8221; book. That chapter (covering details of the implementation of the List class in Scala) promptly pointed out that the list concatenation operator executes in time proportional to the size of the operand on the left. In order to avoid the performance hit we shift to an approach based on iteration and mutation.</p>
-
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">implicit</span> <span class="k">def</span> <span class="n">int2list</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">List</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="k">val</span> <span class="n">buff</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ListBuffer</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span>
-</span><span class='line'>  <span class="k">var</span> <span class="n">counter</span> <span class="k">=</span> <span class="n">arg</span>
-</span><span class='line'>  <span class="k">while</span> <span class="o">(</span><span class="n">counter</span> <span class="o">&gt;</span> <span class="mi">9</span><span class="o">)</span> <span class="o">{</span>
-</span><span class='line'>    <span class="n">buff</span> <span class="o">+=</span> <span class="o">(</span><span class="n">counter</span> <span class="o">%</span> <span class="mi">10</span><span class="o">)</span>
-</span><span class='line'>    <span class="n">counter</span> <span class="k">=</span> <span class="o">(</span><span class="n">counter</span> <span class="o">/</span> <span class="mi">10</span><span class="o">)</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'>  <span class="n">buff</span> <span class="o">+=</span> <span class="n">counter</span>
-</span><span class='line'>  <span class="n">buff</span> <span class="n">toList</span>
-</span><span class='line'><span class="o">}</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>The process for choosing when to use an iterative approach over a functional approach is still somewhat opaque. Scala has an explicit bias in favor of functional methods yet in many cases (including this one) an iterative implementation is the correct one to use. Presumably identifying when to use which approach is largely a function of experience with the language.</p>
-</div>
-  
-  
-
-
-    </article>
-  
-  
-    <article>
       
-  <header>
-    
-      <h1 class="entry-title"><a href="/blog/2010/07/26/learning-scala-from-dead-swiss-mathematicians-palindromes/">Learning Scala From Dead Swiss Mathematicians : Palindromes</a></h1>
-    
-    
-      <p class="meta">
-        
 
 
 
@@ -505,135 +348,38 @@ int2list2: (arg: Int,acc: List[Int])List[Int]
   
 
 
-<time datetime="2010-07-26T12:00:00-05:00" pubdate data-updated="true">Jul 26<span>th</span>, 2010</time>
-        
-      </p>
+<time datetime="2010-10-10T12:00:00-05:00" pubdate data-updated="true">Oct 10<span>th</span>, 2010</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/scala/'>scala</a>
+  
+</span>
+
+
+    </p>
     
-  </header>
-
-
-  <div class="entry-content"><p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/07/learning-scala-from-dead-swiss.html">Heuristic Fencepost</a></p>
-
-<p>As part of my effort to get up to speed with Scala I returned to an old favorite for exploring new languages; working through some of the problems at <a href="http://projecteuler.net">Project Euler</a>. Posting complete answers to specific problems isn&#8217;t terribly interesting and I have no plans to do so here. That said, some facets of these problems do lead to useful digressions which allow for a deeper exploration of the language. We&#8217;ll dig into one such example here.</p>
-
-<p>The problem under consideration is Problem 4 which asks for &#8220;the largest palindrome made from the product of two 3-digit numbers&#8221;. It doesn&#8217;t take much imagination to determine that part of the solution will involve a method, most likely a function of some kind, for identifying whether a number is in fact a palindrome. Okay, but what would such a method look like? The problem lends itself to a simple recursive implementation: divide the integer into a leading digit, a middle integer and a trailing digit and return false if the leading and trailing digits differ, otherwise return the result of the a recursive call with the middle integer.</p>
-
-<p>Easy enough, but a moments reflection tells us we have a problem; we can access the trailing digit in an integer using the mod function and the base of the input integer but there&#8217;s no easy way to access the leading digit. It&#8217;s not as if Int (or even RichInt) extend Seq[Int] or even Seq[Byte]. Fortunately we can shift the problem domain by observing that an input integer is equivalent to an input String in which each digit of the integer maps to a Char in the String. Even better, Scala offers built-in support for regular expressions, and a fairly simple regex should give us access to both the leading and trailing characters and everything in the middle. So, how does Scala&#8217;s regex support stack up?</p>
-
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-<span class='line-number'>21</span>
-<span class='line-number'>22</span>
-<span class='line-number'>23</span>
-<span class='line-number'>24</span>
-<span class='line-number'>25</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// Pattern to be used by the regex-based predicate.  </span>
-</span><span class='line'><span class="c1">// Absolutely must use conservative matching and </span>
-</span><span class='line'><span class="c1">// the backref here to make this work.</span>
-</span><span class='line'><span class="k">val</span> <span class="n">palindromePattern</span> <span class="k">=</span> <span class="s">&quot;&quot;&quot;(\d)(\d*?)\1&quot;&quot;&quot;</span><span class="o">.</span><span class="n">r</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// Recursive helper function to check for a </span>
-</span><span class='line'><span class="c1">//palindrome using a regex</span>
-</span><span class='line'><span class="k">def</span> <span class="n">byRegexHelper</span><span class="o">(</span><span class="n">n</span><span class="k">:</span><span class="kt">String</span><span class="o">)</span><span class="k">:</span><span class="kt">Boolean</span> <span class="o">=</span> <span class="o">{</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// Base case; empty string and single characters </span>
-</span><span class='line'>  <span class="c1">// are by definition palindromes.  Place this </span>
-</span><span class='line'>  <span class="c1">// test up front so that we can handle input values</span>
-</span><span class='line'>  <span class="c1">// of a single character.</span>
-</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">n</span><span class="o">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">n</span><span class="o">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
-</span><span class='line'>    <span class="k">return</span> <span class="kc">true</span>
-</span><span class='line'>  <span class="n">palindromePattern</span><span class="o">.</span><span class="n">unapplySeq</span><span class="o">(</span><span class="n">n</span><span class="o">)</span> <span class="k">match</span> <span class="o">{</span>
-</span><span class='line'>
-</span><span class='line'>    <span class="k">case</span> <span class="nc">Some</span><span class="o">(</span><span class="n">matches</span><span class="o">)</span> <span class="k">=&gt;</span> <span class="n">byRegexHelper</span><span class="o">(</span><span class="n">matches</span><span class="o">(</span><span class="mi">1</span><span class="o">))</span>
-</span><span class='line'>    <span class="k">case</span> <span class="nc">None</span> <span class="k">=&gt;</span> <span class="kc">false</span>
-</span><span class='line'>  <span class="o">}</span>
-</span><span class='line'><span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// Regex-based predicate; convert to a string and call</span>
-</span><span class='line'><span class="c1">// the recrusive function</span>
-</span><span class='line'><span class="k">def</span> <span class="n">byRegex</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">Boolean</span> <span class="o">=</span> <span class="n">byRegexHelper</span><span class="o">(</span><span class="n">arg</span><span class="o">.</span><span class="n">toString</span><span class="o">)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Not bad, actually. It&#8217;s not Perl or Ruby but the deep support for pattern matching in the language combined with relatively easy generation of a Regex from a String makes for a fairly clean syntax. Regex literals would be a small improvement but this is still cleaner than what one finds in Java or even Python.</p>
-
-<p>So we&#8217;ve solved the problem, but can we do better? Do we really need the regex? Strings (or the StringOps they&#8217;re implicitly converted to in 2.8) make use of the SeqLike[Char] trait allowing easy access to the leading and trailing characters using simple method calls. This leads to the following implementation which avoids the overhead of evaluating the regular expression:</p>
-
-<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
-<span class='line-number'>2</span>
-<span class='line-number'>3</span>
-<span class='line-number'>4</span>
-<span class='line-number'>5</span>
-<span class='line-number'>6</span>
-<span class='line-number'>7</span>
-<span class='line-number'>8</span>
-<span class='line-number'>9</span>
-<span class='line-number'>10</span>
-<span class='line-number'>11</span>
-<span class='line-number'>12</span>
-<span class='line-number'>13</span>
-<span class='line-number'>14</span>
-<span class='line-number'>15</span>
-<span class='line-number'>16</span>
-<span class='line-number'>17</span>
-<span class='line-number'>18</span>
-<span class='line-number'>19</span>
-<span class='line-number'>20</span>
-</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="c1">// Recursive helper function to perform the check </span>
-</span><span class='line'><span class="c1">// based on comparisons of the head and last </span>
-</span><span class='line'><span class="c1">// characters in a string</span>
-</span><span class='line'><span class="k">def</span> <span class="n">byStringHelper</span><span class="o">(</span><span class="n">n</span><span class="k">:</span><span class="kt">String</span><span class="o">)</span><span class="k">:</span><span class="kt">Boolean</span> <span class="o">=</span> <span class="o">{</span>
-</span><span class='line'>
-</span><span class='line'>  <span class="c1">// Base case; empty string and single characters</span>
-</span><span class='line'>  <span class="c1">// are by definition palindromes.  Place this test</span>
-</span><span class='line'>  <span class="c1">// up front so that we can handle input values of</span>
-</span><span class='line'>  <span class="c1">// a single character.</span>
-</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">n</span><span class="o">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">n</span><span class="o">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
-</span><span class='line'>    <span class="k">return</span> <span class="kc">true</span>
-</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">n</span><span class="o">.</span><span class="n">head</span> <span class="o">!=</span> <span class="n">n</span><span class="o">.</span><span class="n">last</span><span class="o">)</span>
-</span><span class='line'>    <span class="kc">false</span>
-</span><span class='line'>  <span class="k">else</span>
-</span><span class='line'>    <span class="n">byStringHelper</span><span class="o">(</span><span class="n">n</span><span class="o">.</span><span class="n">substring</span><span class="o">(</span><span class="mi">1</span><span class="o">,</span><span class="n">n</span><span class="o">.</span><span class="n">length</span> <span class="o">-</span> <span class="mi">1</span><span class="o">))</span>
-</span><span class='line'><span class="o">}</span>
-</span><span class='line'>
-</span><span class='line'><span class="c1">// String-based predicate; convert to string and call</span>
-</span><span class='line'><span class="c1">// the recursive function</span>
-</span><span class='line'><span class="k">def</span> <span class="n">byString</span><span class="o">(</span><span class="n">arg</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">Boolean</span> <span class="o">=</span> <span class="n">byStringHelper</span><span class="o">(</span><span class="n">arg</span><span class="o">.</span><span class="n">toString</span><span class="o">)</span>
-</span></code></pre></td></tr></table></div></figure>
-
-
-<p>Also not bad, but still not completely satisfying. Moving away from the use of regular expressions minimizes the benefit of mapping the input integer onto a String in order to solve the problem. Recall that the primary argument for doing so was the inability to access leading digits in an input integer. How significant is this constraint? Is it something we can work around? More on this next time.</p>
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://absurdfarce.github.com/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala/" data-via="" data-counturl="http://absurdfarce.github.com/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala/" >Tweet</a>
+  
+  
+  
 </div>
-  
-  
 
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2010/08/23/learning-scala-from-dead-swiss-mathematicians-return-of-palindromes/" title="Previous Post: Learning Scala from Dead Swiss Mathematicians : Return of Palindromes">&laquo; Learning Scala from Dead Swiss Mathematicians : Return of Palindromes</a>
+      
+      
+    </p>
+  </footer>
+</article>
 
-    </article>
-  
-  <div class="pagination">
-    
-    <a href="/blog/archives">Blog Archives</a>
-    
-  </div>
 </div>
+
 <aside class="sidebar">
   
     <section>
@@ -655,12 +401,13 @@ int2list2: (arg: Int,acc: List[Int])List[Int]
   </ul>
 </section>
 
-Included file &#8216;asides/twitter.html&#8217; not found in _includes directory
+Included file 'asides/twitter.html' not found in _includes directory
 
 
 
   
 </aside>
+
 
     </div>
   </div>
