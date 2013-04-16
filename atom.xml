@@ -4,7 +4,7 @@
   <title><![CDATA[Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-04-11T01:11:04-05:00</updated>
+  <updated>2013-04-15T20:21:38-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -426,9 +426,9 @@
   
   <entry>
     <title type="html"><![CDATA[A Funny Thing Happened While Writing Some Haskell....]]></title>
-    <link href="http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot/"/>
+    <link href="http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell/"/>
     <updated>2010-12-20T12:00:00-06:00</updated>
-    <id>http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell-dot-dot-dot</id>
+    <id>http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell</id>
     <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/12/funny-thing-happened-while-writing-some.html">Heuristic Fencepost</a></p>
 
 <p>Suppose that you&#8217;ve just finished Graham Hutton&#8217;s solid <a href="http://www.cs.nott.ac.uk/~gmh/book.html">introduction</a> to Haskell and now want to take the language for a quick test drive. You decide to stick with something familiar; after noting that the Prelude doesn&#8217;t have an equivalent to Python&#8217;s <a href="http://docs.python.org/2/library/functions.html#range">range</a> function you decide to whip one up yourself. Haskell&#8217;s syntax is still a bit unfamiliar, however, so you decide to implement this function in a different &#8220;mostly functional&#8221; language that you have some experience with. You&#8217;ve been looking for a reason to dip your toes into Scheme again (and it seems to be a good fit here [1]) so you install <a href="http://dynamo.iro.umontreal.ca/wiki/index.php/Main_Page">Gambit Scheme</a> and <a href="http://www.call-cc.org">Chicken Scheme</a> and dig in.</p>
