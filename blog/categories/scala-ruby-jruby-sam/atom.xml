@@ -4,7 +4,7 @@
   <title><![CDATA[Category: scala ruby jruby SAM | Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/blog/categories/scala-ruby-jruby-sam/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-04-15T23:27:40-05:00</updated>
+  <updated>2013-04-15T23:29:29-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -26,7 +26,7 @@
 
 <p>The basic idea at play here is that a closure or anonymous function (either will do here) can be used in place of a SAM implementation if the parameters and return type of the closure match up to those of the method. That assumes your language cares about such things, of course; duck typing makes this less of an issue (as we'll see).</p>
 
-<p>JRuby automatically performs this operation via closure conversion (scroll down to the bottom of the page). Stuart Sierra has recently <a href="http://stuartsierra.com/2010/12/16/single-abstract-method-macro">published</a> a macro for doing something similar in Clojure. Even Java is considering including this feature in an eventual closure implementation (see Brian Goetz's <a href="http://cr.openjdk.java.net/~briangoetz/lambda/lambda-state-2.html">writeup</a> for details). Why should Scala miss out on all the fun?</p>
+<p>JRuby automatically performs this operation via <a href="https://github.com/jruby/jruby/wiki/CallingJavaFromJRuby">closure conversion</a> (scroll down to the bottom of the page). Stuart Sierra has recently <a href="http://stuartsierra.com/2010/12/16/single-abstract-method-macro">published</a> a macro for doing something similar in Clojure. Even Java is considering including this feature in an eventual closure implementation (see Brian Goetz's <a href="http://cr.openjdk.java.net/~briangoetz/lambda/lambda-state-2.html">writeup</a> for details). Why should Scala miss out on all the fun?</p>
 
 <p>Let's take a look at some code to make this discussion more tangible. A simple example of closure conversion in JRuby looks  something like the following:</p>
 
