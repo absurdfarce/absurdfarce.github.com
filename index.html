@@ -563,9 +563,9 @@
 
 <p>Soon after I began working with <a href="http://cassandra.apache.org">Cassandra</a> it became clear to me that if you were in the market for a platform for creating applications that interact with this database you could do a lot worse than <a href="http://clojure.org">Clojure</a>. The lack of a query language [1] suggests that filtering and slicing lists of keys and columns might be a fairly common activity for apps powered by Cassandra. And while many languages support the map/filter/reduce paradigm Clojure&#8217;s use of <a href="http://clojure.org/sequences">sequences</a> throughout the core suggest a natural means to integrate this data into the rest of your application.</p>
 
-<p>Cassandra itself provides an <a href="http://wiki.apache.org/cassandra/API">API</a> that uses the <a href="http://thrift.apache.org">Thrift</a> protocol for manipulating data. We&#8217;ll use this interface to implement a simple proof-of-concept application that might serve as a testbed for manipulating data managed by Cassandra in idiomatic Clojure. Note that the Clojure ecosystem already includes several open-source projects that connect Clojure to Cassandra: these include <a href="https://github.com/robertluo/clj-cassandra">clj-cassandra</a> and <a href="https://github.com/pingles/clj-hector">clj-hector</a>, the latter leveraging the Hector Java client to do it&#8217;s work. In order to keep things simple we choose to avoid any of these third-party libraries; it&#8217;s not as if the Thrift interface imposes a heavy burden on us. Let&#8217;s see how far we can get with what&#8217;s already in the packaging.</p>
+<p>Cassandra itself provides an <a href="http://wiki.apache.org/cassandra/API">API</a> that uses the <a href="http://thrift.apache.org">Thrift</a> protocol for manipulating data. We&#8217;ll use this interface to implement a simple proof-of-concept application that might serve as a testbed for manipulating data managed by Cassandra in idiomatic Clojure. Note that the Clojure ecosystem already includes several open-source projects that connect Clojure to Cassandra: these include <a href="https://github.com/robertluo/clj-cassandra">clj-cassandra</a> and <a href="https://github.com/pingles/clj-hector">clj-hector</a>, the latter leveraging the <a href="http://hector-client.github.io/hector/build/html/index.html">Hector Java client</a> to do it&#8217;s work. In order to keep things simple we choose to avoid any of these third-party libraries; it&#8217;s not as if the Thrift interface imposes a heavy burden on us. Let&#8217;s see how far we can get with what&#8217;s already in the packaging.</p>
 
-<p>That sounds great&#8230; so what exactly are we trying to do? Beginning with the database generated during our previous work with Cassandra we should be able to access sets of keys within a keyspace and a set of columns for any specific key. These structures should be available for manipulation in idiomatic Clojure as sequences. Ideally these sequences would be at least somewhat lazy and transparently support multiple datatypes. [2]</p>
+<p>That sounds great&#8230; so what exactly are we trying to do? Beginning with the database generated during our <a href="http://absurdfarce.github.io/blog/2011/03/29/data-models-and-cassandra/">previous work</a> with Cassandra we should be able to access sets of keys within a keyspace and a set of columns for any specific key. These structures should be available for manipulation in idiomatic Clojure as sequences. Ideally these sequences would be at least somewhat lazy and transparently support multiple datatypes. [2]</p>
 
 <p>Using the Thrift interface requires working with a fair number of Java objects representing return types and/or arguments to the various exposed functions. My Clojure isn&#8217;t yet solid enough to hash out Java interop code without flailing a bit so we kick things off with a Scala implementation. This approach allows us to simplify the interop problem without sacrificing the functional approach, all within a language that is by now fairly familiar.</p>
 
@@ -939,7 +939,7 @@
 
 <p>We should be all set; bring on the questions!</p>
 
-<h1>FOR EACH AUTHOR: WHAT LANGUAGE DO THEY WRITE THEIR TWEETS IN AND HOW MANY FOLLOWERS DO THEY HAVE?</h1>
+<h2>FOR EACH AUTHOR: WHAT LANGUAGE DO THEY WRITE THEIR TWEETS IN AND HOW MANY FOLLOWERS DO THEY HAVE?</h2>
 
 <p>The organizing structure of the Cassandra data model is the column family defined within a keyspace. The keyspace is exactly what it sounds like: a collection of keys, each identifying a distinct entity in your data model. Each column family represents a logical grouping of data about these keys. This data is represented by one or more columns, which are really not much more than a tuple containing a name, value and timestamp. A column family can contain one or more columns for a key in the keyspace, and as it turns out you have a great deal of flexibility here; columns in a column family don&#8217;t have to be defined in advance and do not have to be the same for all keys.</p>
 
@@ -970,7 +970,7 @@ Key: DFW_BigData, language: en, followers: 21
 ...
 </code></pre>
 
-<h1>HOW MANY TWEETS DID EACH AUTHOR WRITE?</h1>
+<h2>HOW MANY TWEETS DID EACH AUTHOR WRITE?</h2>
 
 <p>Okay, so we&#8217;ve got the idea of a column family; we can use them to define a set of information for keys in our keyspace. Clearly this is a useful organizing principle, but in some cases we need a hierarchy that goes a bit deeper. The set of tweets written by an author illustrates just such a case: tweets are written by a specific author, but each tweet has data of it&#8217;s own (the actual content of the tweet, a timestamp indicating when it&#8217;s written, perhaps some geo-location info, etc.). How can we represent this additional level of hierarchy?</p>
 
@@ -1016,7 +1016,7 @@ Authors: MeqqSmile, tweets written: 1
 Authors: Mesoziinha, tweets written: 2
 </code></pre>
 
-<h1>HOW MANY TWEET AUTHORS ARE ALSO FOLLOWERS OF @SPYCED?</h1>
+<h2>HOW MANY TWEET AUTHORS ARE ALSO FOLLOWERS OF @SPYCED?</h2>
 
 <p>We&#8217;re now attempting to replicate functionality that looks very much like a join in a relational database.  Somehow we have to relate one type of resource (the set of followers for a Twitter user) to the set of authors defined in our &#8220;authors&#8221; column family. The Twitter REST API exposes the set of user IDs that follow a given user, so one approach to this problem might be to obtain these IDs and, for each of them, query the &#8220;authors&#8221; table to see if we have an author with a matching ID. As for the user to search for&#8230; well, <a href="http://spyced.blogspot.com">Jonathan Ellis</a> (@spyced) seemed like the obvious choice.</p>
 

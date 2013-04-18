@@ -107,7 +107,7 @@
 
 <p>We should be all set; bring on the questions!</p>
 
-<h1>FOR EACH AUTHOR: WHAT LANGUAGE DO THEY WRITE THEIR TWEETS IN AND HOW MANY FOLLOWERS DO THEY HAVE?</h1>
+<h2>FOR EACH AUTHOR: WHAT LANGUAGE DO THEY WRITE THEIR TWEETS IN AND HOW MANY FOLLOWERS DO THEY HAVE?</h2>
 
 <p>The organizing structure of the Cassandra data model is the column family defined within a keyspace. The keyspace is exactly what it sounds like: a collection of keys, each identifying a distinct entity in your data model. Each column family represents a logical grouping of data about these keys. This data is represented by one or more columns, which are really not much more than a tuple containing a name, value and timestamp. A column family can contain one or more columns for a key in the keyspace, and as it turns out you have a great deal of flexibility here; columns in a column family don&#8217;t have to be defined in advance and do not have to be the same for all keys.</p>
 
@@ -138,7 +138,7 @@ Key: DFW_BigData, language: en, followers: 21
 ...
 </code></pre>
 
-<h1>HOW MANY TWEETS DID EACH AUTHOR WRITE?</h1>
+<h2>HOW MANY TWEETS DID EACH AUTHOR WRITE?</h2>
 
 <p>Okay, so we&#8217;ve got the idea of a column family; we can use them to define a set of information for keys in our keyspace. Clearly this is a useful organizing principle, but in some cases we need a hierarchy that goes a bit deeper. The set of tweets written by an author illustrates just such a case: tweets are written by a specific author, but each tweet has data of it&#8217;s own (the actual content of the tweet, a timestamp indicating when it&#8217;s written, perhaps some geo-location info, etc.). How can we represent this additional level of hierarchy?</p>
 
@@ -184,7 +184,7 @@ Authors: MeqqSmile, tweets written: 1
 Authors: Mesoziinha, tweets written: 2
 </code></pre>
 
-<h1>HOW MANY TWEET AUTHORS ARE ALSO FOLLOWERS OF @SPYCED?</h1>
+<h2>HOW MANY TWEET AUTHORS ARE ALSO FOLLOWERS OF @SPYCED?</h2>
 
 <p>We&#8217;re now attempting to replicate functionality that looks very much like a join in a relational database.  Somehow we have to relate one type of resource (the set of followers for a Twitter user) to the set of authors defined in our &#8220;authors&#8221; column family. The Twitter REST API exposes the set of user IDs that follow a given user, so one approach to this problem might be to obtain these IDs and, for each of them, query the &#8220;authors&#8221; table to see if we have an author with a matching ID. As for the user to search for&#8230; well, <a href="http://spyced.blogspot.com">Jonathan Ellis</a> (@spyced) seemed like the obvious choice.</p>
 

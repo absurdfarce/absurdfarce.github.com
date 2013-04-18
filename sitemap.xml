@@ -36,13 +36,13 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/blog/2011/03/29/data-models-and-cassandra/</loc>
-        <lastmod>2013-04-17T23:53:12-05:00</lastmod>
+        <lastmod>2013-04-17T23:57:14-05:00</lastmod>
     </url>
     <url>
         <loc>
             http://absurdfarce.github.com/blog/2011/05/24/cassandra-and-clojure-the-beginning-of-a-beautiful-friendship/
         </loc>
-        <lastmod>2013-04-17T23:23:47-05:00</lastmod>
+        <lastmod>2013-04-17T23:56:52-05:00</lastmod>
     </url>
     <url>
         <loc>
@@ -56,7 +56,7 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/blog/archives/</loc>
-        <lastmod>2013-04-17T23:53:12-05:00</lastmod>
+        <lastmod>2013-04-17T23:57:14-05:00</lastmod>
     </url>
     <url>
         <loc>http://absurdfarce.github.com/robots.txt</loc>
@@ -64,6 +64,6 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/</loc>
-        <lastmod>2013-04-17T23:53:12-05:00</lastmod>
+        <lastmod>2013-04-17T23:57:14-05:00</lastmod>
     </url>
 </urlset>
