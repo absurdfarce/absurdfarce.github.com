@@ -900,6 +900,364 @@
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2011/03/29/data-models-and-cassandra/">Data Models and Cassandra</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2011-03-29T12:00:00-05:00" pubdate data-updated="true">Mar 29<span>th</span>, 2011</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2011/03/data-models-and-cassandra.html">Heuristic Fencepost</a></p>
+
+<p><a href="http://cassandra.apache.org">Cassandra</a> implements a <a href="http://wiki.apache.org/cassandra/DataModel">data model built on ColumnFamilies</a> which differs from both SQL and document-oriented databases such as CouchDB.  We want to spend a little time with this data model, get to know it a bit, so we setup a simple but quasi-realistic problem space: given a database of tweets, tweet authors and tweet followers attempt to answer a sequence of questions about that data.  The questions should increase in complexity and each new question should explore a different facet of the data model.</p>
+
+<p>The examples below are implemented in Python with a little help from a few excellent libraries:</p>
+
+<ul>
+<li><a href="https://github.com/pycassa/pycassa">Pycassa</a> for interacting with Cassandra.</li>
+<li><a href="http://mike.verdone.ca/twitter/">Twitter tools</a> when we have to interact with Twitter via their REST API</li>
+</ul>
+
+
+<p>We&#8217;ll begin by looking at how we might query an Cassandra instance populated with data in order to find the answers to the questions in our problem space. We&#8217;ll close by briefly discussing how to get the data into Cassandra.</p>
+
+<p>We should be all set; bring on the questions!</p>
+
+<h1>FOR EACH AUTHOR: WHAT LANGUAGE DO THEY WRITE THEIR TWEETS IN AND HOW MANY FOLLOWERS DO THEY HAVE?</h1>
+
+<p>The organizing structure of the Cassandra data model is the column family defined within a keyspace. The keyspace is exactly what it sounds like: a collection of keys, each identifying a distinct entity in your data model. Each column family represents a logical grouping of data about these keys. This data is represented by one or more columns, which are really not much more than a tuple containing a name, value and timestamp. A column family can contain one or more columns for a key in the keyspace, and as it turns out you have a great deal of flexibility here; columns in a column family don&#8217;t have to be defined in advance and do not have to be the same for all keys.</p>
+
+<p>We begin by imagining a column family named &#8220;authors&#8221; in a keyspace defined by the user&#8217;s Twitter handle or screen name. Assume that for each of these keys the &#8220;authors&#8221; column family contains a set of columns, one for each property returned by the &#8220;user/show&#8221; resource found in the Twitter REST API. Let&#8217;s further assume that included in this data are fields named &#8220;lang&#8221; and &#8220;followers_count&#8221; and that these fields correspond to exactly the data we&#8217;re looking for. We can satisfy our requirement by using a range query to identify all keys that fall within a specified range. In our case we want to include all alphanumeric screen names so we query across the range of printable ASCII characters. The Pycassa API makes this very easy [1]:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">import</span> <span class="nn">pycassa</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">cassandra</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s">&quot;twitter&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">authors_cf</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">ColumnFamily</span><span class="p">(</span><span class="n">cassandra</span><span class="p">,</span><span class="s">&quot;authors&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="k">for</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="n">values</span><span class="p">)</span> <span class="ow">in</span> <span class="n">authors_cf</span><span class="o">.</span><span class="n">get_range</span><span class="p">(</span><span class="s">&#39;!&#39;</span><span class="p">,</span><span class="s">&#39;~&#39;</span><span class="p">,[</span><span class="s">&quot;lang&quot;</span><span class="p">,</span><span class="s">&quot;followers_count&quot;</span><span class="p">]):</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;Key: </span><span class="si">%s</span><span class="s">, language: </span><span class="si">%s</span><span class="s">, followers: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="n">values</span><span class="p">[</span><span class="s">&quot;lang&quot;</span><span class="p">],</span><span class="n">values</span><span class="p">[</span><span class="s">&quot;followers_count&quot;</span><span class="p">])</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>The result is exactly what we wanted:</p>
+
+<pre><code>[@varese src]$ python Query1.py 
+Key: Alanfbrum, language: en, followers: 73
+Key: AloisBelaska, language: en, followers: 8
+Key: DASHmiami3, language: en, followers: 11
+Key: DFW_BigData, language: en, followers: 21
+...
+</code></pre>
+
+<h1>HOW MANY TWEETS DID EACH AUTHOR WRITE?</h1>
+
+<p>Okay, so we&#8217;ve got the idea of a column family; we can use them to define a set of information for keys in our keyspace. Clearly this is a useful organizing principle, but in some cases we need a hierarchy that goes a bit deeper. The set of tweets written by an author illustrates just such a case: tweets are written by a specific author, but each tweet has data of it&#8217;s own (the actual content of the tweet, a timestamp indicating when it&#8217;s written, perhaps some geo-location info, etc.). How can we represent this additional level of hierarchy?</p>
+
+<p>We could define a new keyspace consisting of some combination of the author&#8217;s screen name and the tweet ID but this doesn&#8217;t seem terribly efficient; identifying all tweets written by an author is now unnecessarily complicated. Fortunately Cassandra provides a super column family which meets our needs exactly. The value of each column in a super column family is itself a collection of regular columns.</p>
+
+<p>Let&#8217;s apply this structure to the problem at hand. Assume that we also have a super column family named &#8220;tweets&#8221; within our keyspace. For each key we define one or more super columns, one for each tweet written by the author identified by the key. The value of any given super column is a collection of columns, one for each field contained in the results we get when we search for tweets using Twitter&#8217;s search API. Once again we utilize a range query to access the relevant keys:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">import</span> <span class="nn">pycassa</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">cassandra</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s">&quot;twitter&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">tweets_cf</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">ColumnFamily</span><span class="p">(</span><span class="n">cassandra</span><span class="p">,</span><span class="s">&quot;tweets&quot;</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c"># Key in return value from &quot;tweets&quot; super column family is the</span>
+</span><span class='line'><span class="c"># tweet ID, value is a map of per-tweet data. We&#39;re only interested</span>
+</span><span class='line'><span class="c"># in the number of tweets so we only need to compute the size</span>
+</span><span class='line'><span class="c"># of the returned hash.</span>
+</span><span class='line'><span class="k">for</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="n">values</span><span class="p">)</span> <span class="ow">in</span> <span class="n">tweets_cf</span><span class="o">.</span><span class="n">get_range</span><span class="p">(</span><span class="s">&#39;!&#39;</span><span class="p">,</span><span class="s">&#39;~&#39;</span><span class="p">):</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;Authors: </span><span class="si">%s</span><span class="s">, tweets written: </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Running this script gives us the following:</p>
+
+<pre><code>[@varese src]$ python Query2.py
+Authors: Alanfbrum, tweets written: 1
+Authors: AloisBelaska, tweets written: 1
+Authors: DASHmiami3, tweets written: 1
+Authors: DFW_BigData, tweets written: 1
+...
+Authors: LaariPimenteel, tweets written: 2
+Authors: MeqqSmile, tweets written: 1
+Authors: Mesoziinha, tweets written: 2
+</code></pre>
+
+<h1>HOW MANY TWEET AUTHORS ARE ALSO FOLLOWERS OF @SPYCED?</h1>
+
+<p>We&#8217;re now attempting to replicate functionality that looks very much like a join in a relational database.  Somehow we have to relate one type of resource (the set of followers for a Twitter user) to the set of authors defined in our &#8220;authors&#8221; column family. The Twitter REST API exposes the set of user IDs that follow a given user, so one approach to this problem might be to obtain these IDs and, for each of them, query the &#8220;authors&#8221; table to see if we have an author with a matching ID. As for the user to search for&#8230; well, <a href="http://spyced.blogspot.com">Jonathan Ellis</a> (@spyced) seemed like the obvious choice.</p>
+
+<p>Newer versions of Cassandra provide support for indexed slices on a column family. The database maintains an index for a named column within a column family, enabling very efficient lookups for rows in which the column matches a simple query. Query terms can test for equality or whether a column value is greater than or less than an input value [2]. Multiple search clauses can be combined within a single query, but in our case we&#8217;re interested in strict equality only. Our solution to this problem looks something like the following:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">twitter.api</span> <span class="kn">import</span> <span class="n">Twitter</span>
+</span><span class='line'><span class="kn">import</span> <span class="nn">pycassa</span>
+</span><span class='line'><span class="kn">from</span> <span class="nn">pycassa.index</span> <span class="kn">import</span> <span class="o">*</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">cassandra</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s">&quot;twitter&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">authors_cf</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">ColumnFamily</span><span class="p">(</span><span class="n">cassandra</span><span class="p">,</span><span class="s">&quot;authors&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="n">tweets_cf</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">ColumnFamily</span><span class="p">(</span><span class="n">cassandra</span><span class="p">,</span><span class="s">&quot;tweets&quot;</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">twitter</span> <span class="o">=</span> <span class="n">Twitter</span><span class="p">()</span>
+</span><span class='line'>
+</span><span class='line'><span class="c"># Iterate through the set of IDs returned by the Twitter API and execute</span>
+</span><span class='line'><span class="c"># an index search against each ID. The Pycassa API will return a generator</span>
+</span><span class='line'><span class="c"># for each query so we make use of the for expression to determine when</span>
+</span><span class='line'><span class="c"># we should increment the total count.</span>
+</span><span class='line'><span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+</span><span class='line'><span class="k">for</span> <span class="n">authorid</span> <span class="ow">in</span> <span class="n">twitter</span><span class="o">.</span><span class="n">followers</span><span class="o">.</span><span class="n">ids</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s">&quot;spyced&quot;</span><span class="p">):</span>
+</span><span class='line'>    <span class="n">author_expr</span> <span class="o">=</span> <span class="n">create_index_expression</span><span class="p">(</span><span class="s">&#39;id_str&#39;</span><span class="p">,</span><span class="nb">str</span><span class="p">(</span><span class="n">authorid</span><span class="p">))</span>
+</span><span class='line'>    <span class="n">author_clause</span> <span class="o">=</span> <span class="n">create_index_clause</span><span class="p">([</span><span class="n">author_expr</span><span class="p">])</span>
+</span><span class='line'>    <span class="k">for</span> <span class="p">(</span><span class="n">authorkey</span><span class="p">,</span><span class="n">authorprops</span><span class="p">)</span> <span class="ow">in</span> <span class="n">authors_cf</span><span class="o">.</span><span class="n">get_indexed_slices</span><span class="p">(</span><span class="n">author_clause</span><span class="p">):</span>
+</span><span class='line'>        <span class="k">print</span> <span class="n">authorkey</span>
+</span><span class='line'>        <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+</span><span class='line'><span class="k">print</span> <span class="n">count</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>The result looks pretty promising:</p>
+
+<pre><code>[@varese src]$ python Query3.py
+tlberglund
+evidentsoftware
+sreeix
+...
+joealex
+cassandra
+21
+</code></pre>
+
+<p>Some spot checking of these results using the Twitter Web interface seems to confirm the results.</p>
+
+<h1>POPULATING THE DATA</h1>
+
+<p>So far we&#8217;ve talked about accessing data from a Cassandra instance that has already been populated with the data we need. But how do we get it in there in the first place? The answer to this question is a two-step process; first we create the relevant structures within Cassandra and then we use our Python tools to gather and add the actual data.</p>
+
+<p>My preferred tool for managing my Cassandra instance is the pycassaShell that comes with Pycassa. This tool makes it&#8217;s easy to create the column families and indexes we&#8217;ve been working with:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="n">SYSTEM_MANAGER</span><span class="o">.</span><span class="n">create_keyspace</span><span class="p">(</span><span class="s">&#39;twitter&#39;</span><span class="p">,</span><span class="n">replication_factor</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span><span class='line'><span class="n">SYSTEM_MANAGER</span><span class="o">.</span><span class="n">create_column_family</span><span class="p">(</span><span class="s">&#39;twitter&#39;</span><span class="p">,</span><span class="s">&#39;authors&#39;</span><span class="p">,</span><span class="n">comparator_type</span><span class="o">=</span><span class="n">UTF8_TYPE</span><span class="p">)</span>
+</span><span class='line'><span class="n">SYSTEM_MANAGER</span><span class="o">.</span><span class="n">create_column_family</span><span class="p">(</span><span class="s">&#39;twitter&#39;</span><span class="p">,</span><span class="s">&#39;tweets&#39;</span><span class="p">,</span><span class="nb">super</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span><span class="n">comparator_type</span><span class="o">=</span><span class="n">UTF8_TYPE</span><span class="p">)</span>
+</span><span class='line'><span class="n">SYSTEM_MANAGER</span><span class="o">.</span><span class="n">create_index</span><span class="p">(</span><span class="s">&#39;twitter&#39;</span><span class="p">,</span><span class="s">&#39;authors&#39;</span><span class="p">,</span><span class="s">&#39;id_str&#39;</span><span class="p">,</span><span class="n">UTF8_TYPE</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>There are plenty of similar tools around; your mileage may vary.</p>
+
+<p>When it comes to the heavy lifting, we combine Pycassa and Twitter tools into a simple script that does everything we need:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">twitter.api</span> <span class="kn">import</span> <span class="n">Twitter</span>
+</span><span class='line'><span class="kn">import</span> <span class="nn">pycassa</span>
+</span><span class='line'>
+</span><span class='line'><span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">ifilterfalse</span>
+</span><span class='line'>
+</span><span class='line'><span class="c"># Query to use when finding tweets.</span>
+</span><span class='line'><span class="n">searchquery</span> <span class="o">=</span> <span class="s">&quot;#cassandra&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c"># Borrowed from the itertools docs</span>
+</span><span class='line'><span class="k">def</span> <span class="nf">unique_everseen</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+</span><span class='line'>    <span class="s">&quot;List unique elements, preserving order. Remember all elements ever seen.&quot;</span>
+</span><span class='line'>    <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+</span><span class='line'>    <span class="n">seen_add</span> <span class="o">=</span> <span class="n">seen</span><span class="o">.</span><span class="n">add</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">ifilterfalse</span><span class="p">(</span><span class="n">seen</span><span class="o">.</span><span class="n">__contains__</span><span class="p">,</span> <span class="n">iterable</span><span class="p">):</span>
+</span><span class='line'>            <span class="n">seen_add</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+</span><span class='line'>            <span class="k">yield</span> <span class="n">element</span>
+</span><span class='line'>    <span class="k">else</span><span class="p">:</span>
+</span><span class='line'>        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">iterable</span><span class="p">:</span>
+</span><span class='line'>            <span class="n">k</span> <span class="o">=</span> <span class="n">key</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+</span><span class='line'>            <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+</span><span class='line'>                <span class="n">seen_add</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+</span><span class='line'>                <span class="k">yield</span> <span class="n">element</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">populate</span><span class="p">():</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">cassandra</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s">&quot;twitter&quot;</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">authors_cf</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">ColumnFamily</span><span class="p">(</span><span class="n">cassandra</span><span class="p">,</span><span class="s">&quot;authors&quot;</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">tweets_cf</span> <span class="o">=</span> <span class="n">pycassa</span><span class="o">.</span><span class="n">ColumnFamily</span><span class="p">(</span><span class="n">cassandra</span><span class="p">,</span><span class="s">&quot;tweets&quot;</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c"># The Twitter API returns Unicode vals for all string results.  In addition</span>
+</span><span class='line'>    <span class="c"># Pycassa appears to complain when we give it a string encoded in something</span>
+</span><span class='line'>    <span class="c"># other than UTF-8 or a non-string value.  To get around this we perform</span>
+</span><span class='line'>    <span class="c"># an intelligent string conversion; if we get a Unicode type return the</span>
+</span><span class='line'>    <span class="c"># UTF-8 encoding of that string, otherwise return the standard string</span>
+</span><span class='line'>    <span class="c"># representation.</span>
+</span><span class='line'>    <span class="k">def</span> <span class="nf">smart_str</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+</span><span class='line'>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span><span class="nb">unicode</span><span class="p">):</span>
+</span><span class='line'>            <span class="k">return</span> <span class="n">val</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s">&#39;utf-8&#39;</span><span class="p">)</span>
+</span><span class='line'>        <span class="k">else</span><span class="p">:</span>
+</span><span class='line'>            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">search</span> <span class="o">=</span> <span class="n">Twitter</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="s">&quot;search.twitter.com&quot;</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">twitter</span> <span class="o">=</span> <span class="n">Twitter</span><span class="p">()</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">search_results</span> <span class="o">=</span> <span class="n">search</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">q</span><span class="o">=</span><span class="n">searchquery</span><span class="p">,</span><span class="n">rpp</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">tweets</span> <span class="o">=</span> <span class="n">search_results</span><span class="p">[</span><span class="s">&quot;results&quot;</span><span class="p">]</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">print</span> <span class="n">tweets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span class='line'>    <span class="k">for</span> <span class="n">tweet</span> <span class="ow">in</span> <span class="n">tweets</span><span class="p">:</span>
+</span><span class='line'>        <span class="n">tweet_str</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="n">k</span><span class="p">,</span><span class="n">smart_str</span><span class="p">(</span><span class="n">v</span><span class="p">))</span> <span class="k">for</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="n">v</span><span class="p">)</span> <span class="ow">in</span> <span class="n">tweet</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()])</span>
+</span><span class='line'>        <span class="n">tweets_cf</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">tweet</span><span class="p">[</span><span class="s">&quot;from_user&quot;</span><span class="p">],{</span><span class="n">tweet</span><span class="p">[</span><span class="s">&quot;id_str&quot;</span><span class="p">]:</span><span class="n">tweet_str</span><span class="p">})</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;Found </span><span class="si">%d</span><span class="s"> tweets&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">tweets</span><span class="p">)</span>
+</span><span class='line'>    <span class="n">author_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">unique_everseen</span><span class="p">([</span><span class="n">t</span><span class="p">[</span><span class="s">&quot;from_user&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tweets</span><span class="p">]))</span>
+</span><span class='line'>    <span class="k">print</span> <span class="s">&quot;Found </span><span class="si">%d</span><span class="s"> distinct authors&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">author_names</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c"># Convert everything into strings; in Cassandra name and values of a column</span>
+</span><span class='line'>    <span class="c"># are apparently normally converted into strings</span>
+</span><span class='line'>    <span class="k">for</span> <span class="n">author_info</span> <span class="ow">in</span> <span class="p">(</span><span class="n">twitter</span><span class="o">.</span><span class="n">users</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">author_names</span><span class="p">):</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="n">author_name</span> <span class="o">=</span> <span class="n">author_info</span><span class="p">[</span><span class="s">&#39;screen_name&#39;</span><span class="p">]</span>
+</span><span class='line'>        <span class="n">author_info_str</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="n">k</span><span class="p">,</span><span class="n">smart_str</span><span class="p">(</span><span class="n">v</span><span class="p">))</span> <span class="k">for</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="n">v</span><span class="p">)</span> <span class="ow">in</span> <span class="n">author_info</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()])</span>
+</span><span class='line'>        <span class="n">authors_cf</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">author_name</span><span class="p">,</span><span class="n">author_info_str</span><span class="p">)</span>
+</span><span class='line'>        <span class="k">print</span> <span class="s">&quot;Added data for author </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">author_name</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&quot;__main__&quot;</span><span class="p">:</span>
+</span><span class='line'>    <span class="n">populate</span><span class="p">()</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>[1] For sake of brevity this discussion omits a few details, including the configuration of a partitioner and tokens in order to use range queries effectively and how keys are ordered. Consult the project documentation and wiki for additional details.</p>
+
+<p>[2] Here &#8220;greater than&#8221; and &#8220;less than&#8221; are defined in terms of the type provided at index creation time.</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2011/02/04/forks-and-joins-in-scala/">Forks and Joins in Scala</a></h1>
     
     
@@ -2298,11 +2656,11 @@ int2list2: (arg: Int,acc: List[Int])List[Int]
       </li>
     
       <li class="post">
-        <a href="/blog/2011/02/04/forks-and-joins-in-scala/">Forks and Joins in Scala</a>
+        <a href="/blog/2011/03/29/data-models-and-cassandra/">Data Models and Cassandra</a>
       </li>
     
       <li class="post">
-        <a href="/blog/2011/01/07/transmutation-of-scala-closures-into-sam-instances/">Transmutation of Scala closures into SAM instances</a>
+        <a href="/blog/2011/02/04/forks-and-joins-in-scala/">Forks and Joins in Scala</a>
       </li>
     
   </ul>
