@@ -4,7 +4,7 @@
   <title><![CDATA[Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-04-17T23:59:09-05:00</updated>
+  <updated>2013-04-18T00:39:19-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -421,6 +421,633 @@
 <p>[2] A purist might object that Scala is designed to mix features of object-oriented and functional languages, but the bias in favor of functional constructs justifies Scala&#8217;s inclusion here.</p>
 
 <p>[3] As an example, note that in Haskell list comprehensions can be replaced with do-notation. See the Haskell wiki for details.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Cassandra and Clojure: Things To Bytes And Back Again]]></title>
+    <link href="http://absurdfarce.github.com/blog/2011/09/02/cassandra-and-clojure-things-to-bytes-and-back-again/"/>
+    <updated>2011-09-02T12:00:00-05:00</updated>
+    <id>http://absurdfarce.github.com/blog/2011/09/02/cassandra-and-clojure-things-to-bytes-and-back-again</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2011/09/cassandra-and-clojure-things-to-bytes.html">Heuristic Fencepost</a></p>
+
+<p>In a <a href="http://absurdfarce.github.io/blog/2011/05/24/cassandra-and-clojure-the-beginning-of-a-beautiful-friendship/">previous post</a> we briefly discussed the idea of using idiomatic Clojure to access data contained in a Cassandra instance, including transparent conversion to and from Clojure data. We&#8217;ll explore an implementation of this idea, although we won&#8217;t address the question of laziness, in part because there are sizable trade-offs to consider. For example, any solution that provides lazy evaluation must do so while also attempting to minimize the number of trips to the underlying data store. This question may be picked up in yet more future work, but for now we&#8217;ll continue on. We&#8217;ve upgraded to Cassandra 0.8.2 and Clojure 1.2, and we&#8217;re using a new data model (see below), but for the most part we&#8217;ll try to pick up where we left off.</p>
+
+<p>At the core the Cassandra data model is centered around columns. Each of these columns contains both a name and a value, both of which are represented as binary data. This model is very simple, and while it may appear limiting it is in reality quite flexible. The lack of any pre-defined data types avoids any &#8220;impedance mismatch&#8221; resulting from structured data being shoehorned into data types that don&#8217;t really fit. We&#8217;re free to represent column values in any way we see fit; if we can convert it into bytes it&#8217;s fair game. Our problem thus devolves into a question of serialization, and suddenly there are many suitors vying for our attention. Among the set of well-known serialization packages we find Google&#8217;s <a href="https://developers.google.com/protocol-buffers/">Protocol Buffers</a>, <a href="http://thrift.apache.org">Thrift</a> and <a href="http://avro.apache.org">Avro</a>. And since we&#8217;re working in a language with good Java interop we can always have Java&#8217;s built-in serialization (or something similar like <a href="http://code.google.com/p/kryo">Kryo</a>) available. Finally we&#8217;re always free to roll our own.</p>
+
+<p>Let&#8217;s begin by ruling out that last idea. There are already well-tested third-party serialization libraries so unless we believe that all of them suffer from some fatal error it&#8217;s difficult to justify the risk and expense of creating something new.  We&#8217;d also like our approach to have some level of cross-platform support so native Java serialization is excluded (along with Kryo). We also need to be able to encode and decode arbitrary data without defining message types or their payload(s) in advance, a limitation that rules out Protocol Buffers and Thrift. The last man standing is Avro, and fortunately for us he&#8217;s a good candidate. Avro is schema-based but the library includes facilities for generating schemas on the fly by inspecting objects via Java reflection. Also included is a notion of storing schemas with data, allowing the original object to be easily reconstructed as needed. The Avro <a href="http://avro.apache.org/docs/current/spec.html">data model</a> includes a rich set of basic types as well as support for &#8220;complex&#8221; types such as arrays and maps.</p>
+
+<p>We&#8217;ll need to implement a Clojure interface into the Avro functionality; this can be as simple as methods to encode and decode data and schemas. At least some implementations of Avro data files use a pre-defined &#8220;meta-schema&#8221; (consisting of the schema for the embedded data and that data itself) for storing both items. Consumers of these files first decode the meta-schema then use the discovered schema to decode the underlying data. We&#8217;ll follow a similar path for our library. We&#8217;ll also extend our Cassandra support a bit in order to support the insertion of new columns for a given key and column family.</p>
+
+<p>We wind up with the following for our Avro library:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">ns </span><span class="nv">fencepost.avro</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">; Dependencies</span>
+</span><span class='line'><span class="c1">; avro 1.5.2</span>
+</span><span class='line'><span class="c1">; paranamer 2.0 (required by Avro)</span>
+</span><span class='line'><span class="c1">; jackson 1.8.5 (required by Avro)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="nb">import </span><span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.avro</span> <span class="nv">Schema</span><span class="p">)</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.avro.generic</span> <span class="nv">GenericDatumReader</span><span class="p">)</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.avro.io</span> <span class="nv">BufferedBinaryEncoder</span> <span class="nv">EncoderFactory</span> <span class="nv">DecoderFactory</span><span class="p">)</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.avro.reflect</span> <span class="nv">ReflectData</span> <span class="nv">ReflectDatumWriter</span><span class="p">)</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">(</span><span class="nf">java.io</span> <span class="nv">ByteArrayOutputStream</span> <span class="nv">ByteArrayInputStream</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">get_meta_schema</span> <span class="p">[]</span>
+</span><span class='line'>      <span class="c1">; Ideally we&#39;d use a record for this sort of thing but doing so would require setX()</span>
+</span><span class='line'>      <span class="c1">; accessors for all fields.  Use of a map here is less precise but quite a bit easier</span>
+</span><span class='line'>      <span class="c1">; to code.</span>
+</span><span class='line'>      <span class="s">&quot;{\&quot;type\&quot;: \&quot;map\&quot;, \&quot;values\&quot;: \&quot;bytes\&quot;}&quot;</span>
+</span><span class='line'><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">encode_with_schema</span> <span class="p">[</span><span class="nv">target</span><span class="p">]</span>
+</span><span class='line'>      <span class="s">&quot;Use Java reflection to generate a schema for the input object and return that schema along with encoded data&quot;</span>
+</span><span class='line'>      <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">targetschema</span> <span class="p">(</span><span class="nf">.getSchema</span> <span class="p">(</span><span class="nf">ReflectData/get</span><span class="p">)</span> <span class="p">(</span><span class="nf">.getClass</span> <span class="nv">target</span><span class="p">))</span>
+</span><span class='line'>              <span class="nv">targetwriter</span> <span class="p">(</span><span class="nf">ReflectDatumWriter.</span> <span class="nv">targetschema</span><span class="p">)</span>
+</span><span class='line'>      <span class="nv">buffer</span> <span class="p">(</span><span class="nf">ByteArrayOutputStream.</span><span class="p">)</span>
+</span><span class='line'>              <span class="nv">encoder</span> <span class="p">(</span><span class="nf">.binaryEncoder</span> <span class="p">(</span><span class="nf">EncoderFactory.</span><span class="p">)</span> <span class="nv">buffer</span> <span class="nv">nil</span><span class="p">)]</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="c1">; Populate the buffer with Avro data for the target.  Note that we can&#39;t bundle the</span>
+</span><span class='line'>      <span class="c1">; whole thing up into a single let expression because of our reliance on side effects.</span>
+</span><span class='line'>      <span class="p">(</span><span class="nf">.write</span> <span class="nv">targetwriter</span> <span class="nv">target</span> <span class="nv">encoder</span><span class="p">)</span>
+</span><span class='line'>      <span class="p">(</span><span class="nf">.flush</span> <span class="nv">encoder</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">targetdata</span> <span class="p">(</span><span class="nf">.toByteArray</span> <span class="nv">buffer</span><span class="p">)</span>
+</span><span class='line'>            <span class="nv">metawriter</span> <span class="p">(</span><span class="nf">ReflectDatumWriter.</span> <span class="p">(</span><span class="nf">Schema/parse</span> <span class="p">(</span><span class="nf">get_meta_schema</span><span class="p">)))]</span>
+</span><span class='line'>        <span class="p">(</span><span class="nf">.reset</span> <span class="nv">buffer</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">(</span><span class="nf">.write</span> <span class="nv">metawriter</span>
+</span><span class='line'>            <span class="p">{</span><span class="s">&quot;schema&quot;</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="p">(</span><span class="nf">.toString</span> <span class="nv">targetschema</span><span class="p">))</span> <span class="s">&quot;data&quot;</span> <span class="nv">targetdata</span><span class="p">}</span>
+</span><span class='line'>            <span class="nv">encoder</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">(</span><span class="nf">.flush</span> <span class="nv">encoder</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">(</span><span class="nf">.toByteArray</span> <span class="nv">buffer</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">)</span>
+</span><span class='line'>      <span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">decode_from_schema</span> <span class="p">[</span><span class="nv">indata</span><span class="p">]</span>
+</span><span class='line'>      <span class="s">&quot;Use the meta_schema to extract data and schema and then extract raw data&quot;</span>
+</span><span class='line'>      <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">metareader</span> <span class="p">(</span><span class="nf">GenericDatumReader.</span> <span class="p">(</span><span class="nf">Schema/parse</span> <span class="p">(</span><span class="nf">get_meta_schema</span><span class="p">)))</span>
+</span><span class='line'>              <span class="nv">buffer</span> <span class="p">(</span><span class="nf">ByteArrayInputStream.</span> <span class="nv">indata</span><span class="p">)</span>
+</span><span class='line'>              <span class="nv">decoder</span> <span class="p">(</span><span class="nf">.binaryDecoder</span> <span class="p">(</span><span class="nf">DecoderFactory.</span><span class="p">)</span> <span class="nv">buffer</span> <span class="nv">nil</span><span class="p">)</span>
+</span><span class='line'>      <span class="nv">middata</span> <span class="p">(</span><span class="nf">.read</span> <span class="nv">metareader</span> <span class="nv">nil</span> <span class="nv">decoder</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="c1">; The data type returned from the underlying Avro Java code needs a bit</span>
+</span><span class='line'>      <span class="c1">; of massaging before we can move forward.  Avro decoders return strings</span>
+</span><span class='line'>      <span class="c1">; as instances of Utf8 objects so we have to apply &quot;str&quot; to them directly</span>
+</span><span class='line'>      <span class="c1">; in order to get back something we can work with.</span>
+</span><span class='line'>      <span class="p">{</span><span class="nv">schema</span> <span class="s">&quot;schema&quot;</span> <span class="nv">data</span> <span class="s">&quot;data&quot;</span><span class="p">}</span> <span class="p">(</span><span class="nb">zipmap </span><span class="p">(</span><span class="nb">map str </span><span class="p">(</span><span class="nb">keys </span><span class="nv">middata</span><span class="p">))</span> <span class="p">(</span><span class="nb">vals </span><span class="nv">middata</span><span class="p">))</span>
+</span><span class='line'>      <span class="nv">schemabytes</span> <span class="p">(</span><span class="nf">byte-array</span> <span class="p">(</span><span class="nf">.capacity</span> <span class="nv">schema</span><span class="p">))</span>
+</span><span class='line'>      <span class="nv">databytes</span> <span class="p">(</span><span class="nf">byte-array</span> <span class="p">(</span><span class="nf">.capacity</span> <span class="nv">data</span><span class="p">))]</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="c1">; Ah, more side effects.  The Java Avro implementation makes heavy use of</span>
+</span><span class='line'>      <span class="c1">; NIO ByteBuffers, so we&#39;re forced to convert them into byte arrays before</span>
+</span><span class='line'>      <span class="c1">; continuing. </span>
+</span><span class='line'>      <span class="p">(</span><span class="nf">.get</span> <span class="nv">schema</span> <span class="nv">schemabytes</span><span class="p">)</span>
+</span><span class='line'>      <span class="p">(</span><span class="nf">.get</span> <span class="nv">data</span> <span class="nv">databytes</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">targetreader</span> <span class="p">(</span><span class="nf">GenericDatumReader.</span> <span class="p">(</span><span class="nf">Schema/parse</span> <span class="p">(</span><span class="nf">String.</span> <span class="nv">schemabytes</span><span class="p">)))</span>
+</span><span class='line'>           <span class="nv">targetdecoder</span> <span class="p">(</span><span class="nf">.binaryDecoder</span> <span class="p">(</span><span class="nf">DecoderFactory.</span><span class="p">)</span> <span class="nv">databytes</span> <span class="nv">nil</span><span class="p">)]</span>
+</span><span class='line'>           <span class="p">(</span><span class="nf">.read</span> <span class="nv">targetreader</span> <span class="nv">nil</span> <span class="nv">targetdecoder</span><span class="p">)</span>
+</span><span class='line'>       <span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>After the improvements described above our Cassandra library now looks like:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">ns </span><span class="nv">fencepost.cassandra</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">; Dependencies</span>
+</span><span class='line'><span class="c1">; apache-cassandra-thrift-0.8.2.jar</span>
+</span><span class='line'><span class="c1">; libthrift-0.6.jar</span>
+</span><span class='line'><span class="c1">; slf4j-api-1.6.1.jar</span>
+</span><span class='line'><span class="c1">; slf4j-log4j12-1.6.1.jar</span>
+</span><span class='line'><span class="c1">; log4j-1.2.16.jar</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="nb">import </span><span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.cassandra.thrift</span> <span class="nv">Cassandra$Client</span> <span class="nv">SliceRange</span> <span class="nv">SlicePredicate</span> <span class="nv">ColumnParent</span> <span class="nv">KeyRange</span> <span class="nv">ConsistencyLevel</span> <span class="nv">ColumnPath</span> <span class="nv">Column</span><span class="p">)</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.thrift.transport</span> <span class="nv">TFramedTransport</span> <span class="nv">TSocket</span><span class="p">)</span>
+</span><span class='line'>        <span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.thrift.protocol</span> <span class="nv">TBinaryProtocol</span><span class="p">)</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">(</span><span class="nf">java.nio</span> <span class="nv">ByteBuffer</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">; A quick note on usage.  The Cassandra Java API returns &quot;this&quot; for many of the setX() methods on the setters of core objects in the Thrift</span>
+</span><span class='line'><span class="c1">; API.  Our usage here consistently employs the doto syntax rather than relying on these return values.  This is largely a matter of </span>
+</span><span class='line'><span class="c1">; convention, but in this case it appears to make the code a bit clearer to read.  Your mileage may vary.</span>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">connect</span> <span class="p">[</span><span class="nv">host</span> <span class="nv">port</span> <span class="nv">keyspace</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Connect to a Cassandra instance on the specified host and port.  Set things up to use the specified key space.&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">transport</span> <span class="p">(</span><span class="nf">TFramedTransport.</span> <span class="p">(</span><span class="nf">TSocket.</span> <span class="nv">host</span> <span class="nv">port</span><span class="p">))</span>
+</span><span class='line'>        <span class="nv">protocol</span> <span class="p">(</span><span class="nf">TBinaryProtocol.</span> <span class="nv">transport</span><span class="p">)</span>
+</span><span class='line'>        <span class="nv">client</span> <span class="p">(</span><span class="nf">Cassandra$Client.</span> <span class="nv">protocol</span><span class="p">)]</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.open</span> <span class="nv">transport</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.set_keyspace</span> <span class="nv">client</span> <span class="nv">keyspace</span><span class="p">)</span>
+</span><span class='line'>    <span class="nv">client</span>
+</span><span class='line'>    <span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">get_range_slices</span> <span class="p">[</span><span class="nv">client</span> <span class="nv">cf</span> <span class="nv">start</span> <span class="nv">end</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Get a list of KeySlices for every key in the range beginning with start and ending with end&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">slice_range</span>
+</span><span class='line'>        <span class="p">(</span><span class="nb">doto </span><span class="p">(</span><span class="nf">SliceRange.</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setStart</span> <span class="p">(</span><span class="nf">byte-array</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setFinish</span> <span class="p">(</span><span class="nf">byte-array</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setReversed</span> <span class="nv">false</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setCount</span> <span class="mi">100</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">)</span>
+</span><span class='line'>        <span class="nv">slice_predicate</span>
+</span><span class='line'>        <span class="p">(</span><span class="nb">doto </span><span class="p">(</span><span class="nf">SlicePredicate.</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setSlice_range</span> <span class="nv">slice_range</span><span class="p">))</span>
+</span><span class='line'>        <span class="nv">column_parent</span> <span class="p">(</span><span class="nf">ColumnParent.</span> <span class="nv">cf</span><span class="p">)</span>
+</span><span class='line'>        <span class="nv">key_range</span>
+</span><span class='line'>        <span class="p">(</span><span class="nb">doto </span><span class="p">(</span><span class="nf">KeyRange.</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setStart_key</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="nv">start</span><span class="p">))</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setEnd_key</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="nv">end</span><span class="p">)))</span>
+</span><span class='line'>        <span class="p">]</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.get_range_slices</span> <span class="nv">client</span> <span class="nv">column_parent</span> <span class="nv">slice_predicate</span> <span class="nv">key_range</span> <span class="nv">ConsistencyLevel/ONE</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">range_slices_keys</span> <span class="p">[</span><span class="nv">slices</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Retrieve the set of keys in a list of KeySlices&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">String.</span> <span class="p">(</span><span class="nf">.getKey</span> <span class="nv">%</span><span class="p">))</span> <span class="nv">slices</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">range_slices_columns</span> <span class="p">[</span><span class="nv">slices</span> <span class="nv">key</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Given a list of KeySlices retrieve a map of the columns associated with the specified key&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">match</span> <span class="p">(</span><span class="nb">first </span><span class="p">(</span><span class="nb">filter </span><span class="o">#</span><span class="p">(</span><span class="nb">= key </span><span class="p">(</span><span class="nf">String.</span> <span class="p">(</span><span class="nf">.getKey</span> <span class="nv">%</span><span class="p">)))</span> <span class="nv">slices</span><span class="p">))]</span>
+</span><span class='line'>    <span class="p">(</span><span class="nb">cond </span><span class="p">(</span><span class="nb">nil? </span><span class="nv">match</span><span class="p">)</span> <span class="nv">nil</span>
+</span><span class='line'>          <span class="p">(</span><span class="nb">true? </span><span class="nv">true</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">urcols</span> <span class="p">(</span><span class="nf">.getColumns</span> <span class="nv">match</span><span class="p">)</span>
+</span><span class='line'>                <span class="nv">cols</span> <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">.getColumn</span> <span class="nv">%</span><span class="p">)</span> <span class="nv">urcols</span><span class="p">)]</span>
+</span><span class='line'>            <span class="p">(</span><span class="nb">zipmap </span><span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nb">keyword </span><span class="p">(</span><span class="nf">String.</span> <span class="p">(</span><span class="nf">.getName</span> <span class="nv">%</span><span class="p">)))</span> <span class="nv">cols</span><span class="p">)</span>
+</span><span class='line'>                    <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">.getValue</span> <span class="nv">%</span><span class="p">)</span> <span class="nv">cols</span><span class="p">))</span>
+</span><span class='line'>            <span class="p">)</span>
+</span><span class='line'>          <span class="p">)</span>
+</span><span class='line'>    <span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">insert</span> <span class="p">[</span><span class="nv">client</span> <span class="nb">key </span><span class="nv">cf</span> <span class="nv">colname</span> <span class="nv">colval_bytes</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Insert the specified column into the specified column family.  At present we don&#39;t support super columns&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">key_bytes</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="nv">key</span><span class="p">)</span>
+</span><span class='line'>       <span class="nv">key_buffer</span> <span class="p">(</span><span class="nf">ByteBuffer/allocate</span> <span class="p">(</span><span class="nb">alength </span><span class="nv">key_bytes</span><span class="p">))</span>
+</span><span class='line'>       <span class="nv">column_parent</span>
+</span><span class='line'>        <span class="p">(</span><span class="nb">doto </span><span class="p">(</span><span class="nf">ColumnParent.</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.setColumn_family</span> <span class="nv">cf</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>       <span class="nv">colname_bytes</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="nv">colname</span><span class="p">)</span>
+</span><span class='line'>       <span class="nv">column</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">doto </span><span class="p">(</span><span class="nf">Column.</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.setName</span> <span class="nv">colname_bytes</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.setValue</span> <span class="nv">colval_bytes</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.setTimestamp</span> <span class="p">(</span><span class="nf">System/currentTimeMillis</span><span class="p">))</span>
+</span><span class='line'>  <span class="p">)]</span>
+</span><span class='line'>
+</span><span class='line'>       <span class="c1">; Populate the built ByteBuffer with the contents of the input key</span>
+</span><span class='line'>       <span class="p">(</span><span class="nf">.put</span> <span class="nv">key_buffer</span> <span class="nv">key_bytes</span><span class="p">)</span>
+</span><span class='line'>       <span class="p">(</span><span class="nf">.flip</span> <span class="nv">key_buffer</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>       <span class="p">(</span><span class="nf">.insert</span> <span class="nv">client</span> <span class="nv">key_buffer</span> <span class="nv">column_parent</span> <span class="nv">column</span> <span class="nv">ConsistencyLevel/ONE</span><span class="p">)</span>
+</span><span class='line'>       <span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Our core example will be built around a collection of employee records. We want to create a report on these employees using attributes defined in various well-known columns. We&#8217;d like to access the values in these columns as simple data types (booleans, integers, perhaps even an array or a map) but we&#8217;d like to do so through a uniform interface. We don&#8217;t want to access certain columns in certain ways, as if we &#8220;knew&#8221; that a specific column contained data of a specific type. Any such approach is by definition brittle if the underlying data model should shift in flight (as data models are known to do).</p>
+
+<p>After finishing up with our Clojure libraries we implement a simple app for populating our Cassandra instance with randomly-generated employee information:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="c1">; Populate data for a set of random users to a Cassandra instance.</span>
+</span><span class='line'><span class="c1">;</span>
+</span><span class='line'><span class="c1">; Users consist of the following set of data:</span>
+</span><span class='line'><span class="c1">; - a username [String]</span>
+</span><span class='line'><span class="c1">; - a user ID [integer]</span>
+</span><span class='line'><span class="c1">; - a flag indicating whether the user is &quot;active&quot; [boolean]</span>
+</span><span class='line'><span class="c1">; - a list of location IDs for each user [list of integer]</span>
+</span><span class='line'><span class="c1">;</span>
+</span><span class='line'><span class="c1">; User records are keyed by username rather than user IDs, mainly because at the moment </span>
+</span><span class='line'><span class="c1">; we only support strings for key values.  The Cassandra API exposes keys as byte arrays </span>
+</span><span class='line'><span class="c1">; so we could extend our Cassandra support to include other datatypes.</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="nf">use</span> <span class="o">&#39;</span><span class="p">[</span><span class="nv">fencepost.avro</span><span class="p">])</span>
+</span><span class='line'><span class="p">(</span><span class="nf">use</span> <span class="o">&#39;</span><span class="p">[</span><span class="nv">fencepost.cassandra</span><span class="p">])</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="nb">import </span><span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.commons.lang3</span> <span class="nv">RandomStringUtils</span><span class="p">)</span>
+</span><span class='line'>  <span class="o">&#39;</span><span class="p">(</span><span class="nf">java.util</span> <span class="nv">Random</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'><span class="c1">; Utility function to combine our Avro lib with our Cassandra lib</span>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">add_user</span> <span class="p">[</span><span class="nv">client</span> <span class="nv">username</span> <span class="nv">userid</span> <span class="nv">active</span> <span class="nv">locationids</span><span class="p">]</span>
+</span><span class='line'>      <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">userid_data</span> <span class="p">(</span><span class="nf">encode_with_schema</span> <span class="nv">userid</span><span class="p">)</span>
+</span><span class='line'>              <span class="nv">active_data</span> <span class="p">(</span><span class="nf">encode_with_schema</span> <span class="nv">active</span><span class="p">)</span>
+</span><span class='line'>      <span class="nv">locationids_data</span> <span class="p">(</span><span class="nf">encode_with_schema</span> <span class="nv">locationids</span><span class="p">)]</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">insert</span> <span class="nv">client</span> <span class="nv">username</span> <span class="s">&quot;employee&quot;</span> <span class="s">&quot;userid&quot;</span> <span class="nv">userid_data</span><span class="p">)</span>
+</span><span class='line'>      <span class="p">(</span><span class="nf">insert</span> <span class="nv">client</span> <span class="nv">username</span> <span class="s">&quot;employee&quot;</span> <span class="s">&quot;active&quot;</span> <span class="nv">active_data</span><span class="p">)</span>
+</span><span class='line'>              <span class="p">(</span><span class="nf">insert</span> <span class="nv">client</span> <span class="nv">username</span> <span class="s">&quot;employee&quot;</span> <span class="s">&quot;locationids&quot;</span> <span class="nv">locationids_data</span><span class="p">)</span>
+</span><span class='line'>      <span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">; Generate a list of random usernames</span>
+</span><span class='line'><span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">client</span> <span class="p">(</span><span class="nf">connect</span> <span class="s">&quot;localhost&quot;</span> <span class="mi">9160</span> <span class="s">&quot;employees&quot;</span><span class="p">)]</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">dotimes </span><span class="p">[</span><span class="nv">n</span> <span class="mi">10</span><span class="p">]</span>
+</span><span class='line'>                 <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">username</span> <span class="p">(</span><span class="nf">RandomStringUtils/randomAlphanumeric</span> <span class="mi">16</span><span class="p">)</span>
+</span><span class='line'>               <span class="nv">random</span> <span class="p">(</span><span class="nf">Random.</span><span class="p">)</span>
+</span><span class='line'>           <span class="nv">userid</span> <span class="p">(</span><span class="nf">.nextInt</span> <span class="nv">random</span> <span class="mi">1000</span><span class="p">)</span>
+</span><span class='line'>           <span class="nv">active</span> <span class="p">(</span><span class="nf">.nextBoolean</span> <span class="nv">random</span><span class="p">)</span>
+</span><span class='line'>           <span class="nv">locationids</span> <span class="p">(</span><span class="nb">into </span><span class="p">[]</span> <span class="p">(</span><span class="nf">repeatedly</span> <span class="mi">10</span> <span class="o">#</span><span class="p">(</span><span class="nf">.nextInt</span> <span class="nv">random</span> <span class="mi">100</span><span class="p">)))]</span>
+</span><span class='line'>                      <span class="p">(</span><span class="nf">add_user</span> <span class="nv">client</span> <span class="nv">username</span> <span class="nv">userid</span> <span class="nv">active</span> <span class="nv">locationids</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nf">format</span> <span class="s">&quot;Added user %s: [%s %s %s]&quot;</span> <span class="nv">username</span> <span class="nv">userid</span> <span class="nv">active</span> <span class="nv">locationids</span><span class="p">))</span>
+</span><span class='line'>          <span class="p">)</span>
+</span><span class='line'>      <span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<pre><code>[varese clojure]$ ~/local/bin/clojure add_employee_data.clj 
+Added user gFc0pVnLKPnjrrLx: [158 true [77 73 99 58 31 64 1 37 70 69]]
+Added user 5gGh9anHwFINpr5t: [459 true [34 71 28 1 2 84 11 33 37 28]]
+Added user pGRMeXBTFoBIWhud: [945 true [45 83 51 45 11 4 80 68 73 27]]
+...
+</code></pre>
+
+<p>We&#8217;re now ready to create our reporting application. Using Avro and a consistent meta-schema this comes off fairly easily:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="c1">; Retrieve information from the Cassandra database about one of our employees</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="nf">use</span> <span class="o">&#39;</span><span class="p">[</span><span class="nv">fencepost.avro</span><span class="p">])</span>
+</span><span class='line'><span class="p">(</span><span class="nf">use</span> <span class="o">&#39;</span><span class="p">[</span><span class="nv">fencepost.cassandra</span><span class="p">])</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">evaluate_user</span> <span class="p">[</span><span class="nv">slices</span> <span class="nv">username</span><span class="p">]</span>
+</span><span class='line'>      <span class="s">&quot;Gather information for the specified user and display a minimal report about them&quot;</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="c1">; Note that the code below says nothing about types.  We specify the column names we</span>
+</span><span class='line'>      <span class="c1">; wish to access but whatever Cassandra + Avro supplies for the value of that column</span>
+</span><span class='line'>      <span class="c1">; is what we get.</span>
+</span><span class='line'>     <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">user_data</span> <span class="p">(</span><span class="nf">range_slices_columns</span> <span class="nv">slices</span> <span class="nv">username</span><span class="p">)</span>
+</span><span class='line'>             <span class="nv">userid</span> <span class="p">(</span><span class="nf">decode_from_schema</span> <span class="p">(</span><span class="nf">user_data</span> <span class="ss">:userid</span><span class="p">))</span>
+</span><span class='line'>             <span class="nv">active</span> <span class="p">(</span><span class="nf">decode_from_schema</span> <span class="p">(</span><span class="nf">user_data</span> <span class="ss">:active</span><span class="p">))</span>
+</span><span class='line'>             <span class="nv">locationids</span> <span class="p">(</span><span class="nf">decode_from_schema</span> <span class="p">(</span><span class="nf">user_data</span> <span class="ss">:locationids</span><span class="p">))]</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nf">format</span> <span class="s">&quot;Username: %s&quot;</span> <span class="nv">username</span><span class="p">))</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nf">format</span> <span class="s">&quot;Userid: %s&quot;</span> <span class="nv">userid</span><span class="p">))</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&gt; </span><span class="nv">userid</span> <span class="mi">0</span><span class="p">)</span> <span class="s">&quot;Userid is greater than zero&quot;</span> <span class="s">&quot;Userid is not greater than zero&quot;</span><span class="p">))</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nf">format</span> <span class="s">&quot;Active: %s&quot;</span> <span class="nv">active</span><span class="p">))</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="k">if </span><span class="nv">active</span> <span class="s">&quot;User is active&quot;</span> <span class="s">&quot;User is not active&quot;</span><span class="p">))</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="c1">; Every user should have at least one location ID.</span>
+</span><span class='line'>      <span class="c1">;</span>
+</span><span class='line'>      <span class="c1">; Well, they would if we were able to successfully handle an Avro record.</span>
+</span><span class='line'>      <span class="c1">;(assert (&gt; (count locationids) 0))</span>
+</span><span class='line'>      <span class="p">)</span>
+</span><span class='line'><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">client</span> <span class="p">(</span><span class="nf">connect</span> <span class="s">&quot;localhost&quot;</span> <span class="mi">9160</span> <span class="s">&quot;employees&quot;</span><span class="p">)</span>
+</span><span class='line'>      <span class="nv">key_slices</span> <span class="p">(</span><span class="nf">get_range_slices</span> <span class="nv">client</span> <span class="s">&quot;employee&quot;</span> <span class="s">&quot;!&quot;</span> <span class="s">&quot;~&quot;</span><span class="p">)</span>
+</span><span class='line'>      <span class="nb">keys </span><span class="p">(</span><span class="nf">range_slices_keys</span> <span class="nv">key_slices</span><span class="p">)]</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nf">format</span> <span class="s">&quot;Found %d users&quot;</span> <span class="p">(</span><span class="nb">count </span><span class="nv">keys</span><span class="p">)))</span>
+</span><span class='line'>      <span class="p">(</span><span class="nb">dotimes </span><span class="p">[</span><span class="nv">n</span> <span class="p">(</span><span class="nb">count </span><span class="nv">keys</span><span class="p">)]</span>
+</span><span class='line'>                 <span class="p">(</span><span class="nf">evaluate_user</span> <span class="nv">key_slices</span> <span class="p">(</span><span class="nb">nth keys </span><span class="nv">n</span><span class="p">))</span>
+</span><span class='line'>      <span class="p">)</span>
+</span><span class='line'>    <span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<pre><code>[varese clojure]$ ~/local/bin/clojure get_employee_data.clj 
+Found 10 users
+Username: 5gGh9anHwFINpr5t
+Userid: 459
+Userid is greater than zero
+Active: true
+User is active
+...
+</code></pre>
+
+<p>And in order to verify our assumptions about simple cross-platform support we create a Ruby version of something very much like our reporting application:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;rubygems&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;avro&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;cassandra&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">evaluate_avro_data</span> <span class="n">bytes</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># Define the meta-schema</span>
+</span><span class='line'>  <span class="n">meta_schema</span> <span class="o">=</span> <span class="ss">Avro</span><span class="p">:</span><span class="ss">:Schema</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="s2">&quot;{</span><span class="se">\&quot;</span><span class="s2">type</span><span class="se">\&quot;</span><span class="s2">: </span><span class="se">\&quot;</span><span class="s2">map</span><span class="se">\&quot;</span><span class="s2">, </span><span class="se">\&quot;</span><span class="s2">values</span><span class="se">\&quot;</span><span class="s2">: </span><span class="se">\&quot;</span><span class="s2">bytes</span><span class="se">\&quot;</span><span class="s2">}&quot;</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># Read the meta source and extract the contained data and schema</span>
+</span><span class='line'>  <span class="n">meta_datum_reader</span> <span class="o">=</span> <span class="ss">Avro</span><span class="p">:</span><span class="ss">:IO</span><span class="o">::</span><span class="no">DatumReader</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">meta_schema</span><span class="p">)</span>
+</span><span class='line'>  <span class="n">meta_val</span> <span class="o">=</span> <span class="n">meta_datum_reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="ss">Avro</span><span class="p">:</span><span class="ss">:IO</span><span class="o">::</span><span class="no">BinaryDecoder</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="no">StringIO</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">bytes</span><span class="p">)))</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># Build a new reader which can handle the indicated schema</span>
+</span><span class='line'>  <span class="n">schema</span> <span class="o">=</span> <span class="ss">Avro</span><span class="p">:</span><span class="ss">:Schema</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">meta_val</span><span class="o">[</span><span class="s2">&quot;schema&quot;</span><span class="o">]</span><span class="p">)</span>
+</span><span class='line'>  <span class="n">datum_reader</span> <span class="o">=</span> <span class="ss">Avro</span><span class="p">:</span><span class="ss">:IO</span><span class="o">::</span><span class="no">DatumReader</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span>
+</span><span class='line'>  <span class="n">val</span> <span class="o">=</span> <span class="n">datum_reader</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="ss">Avro</span><span class="p">:</span><span class="ss">:IO</span><span class="o">::</span><span class="no">BinaryDecoder</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="no">StringIO</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">meta_val</span><span class="o">[</span><span class="s2">&quot;data&quot;</span><span class="o">]</span><span class="p">)))</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">client</span> <span class="o">=</span> <span class="no">Cassandra</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s1">&#39;employees&#39;</span><span class="p">,</span> <span class="s1">&#39;127.0.0.1:9160&#39;</span><span class="p">)</span>
+</span><span class='line'><span class="n">client</span><span class="o">.</span><span class="n">get_range</span><span class="p">(</span><span class="ss">:employee</span><span class="p">,{</span><span class="ss">:start_key</span> <span class="o">=&gt;</span> <span class="s2">&quot;!&quot;</span><span class="p">,</span><span class="ss">:finish_key</span> <span class="o">=&gt;</span> <span class="s2">&quot;~&quot;</span><span class="p">})</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">k</span><span class="p">,</span><span class="n">v</span><span class="o">|</span>
+</span><span class='line'>  <span class="n">userid</span> <span class="o">=</span> <span class="n">evaluate_avro_data</span> <span class="n">v</span><span class="o">[</span><span class="s2">&quot;userid&quot;</span><span class="o">]</span>
+</span><span class='line'>  <span class="n">active</span> <span class="o">=</span> <span class="n">evaluate_avro_data</span> <span class="n">v</span><span class="o">[</span><span class="s2">&quot;active&quot;</span><span class="o">]</span>
+</span><span class='line'>  <span class="n">locationids</span> <span class="o">=</span> <span class="n">evaluate_avro_data</span> <span class="n">v</span><span class="o">[</span><span class="s2">&quot;locationids&quot;</span><span class="o">]</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;Username: </span><span class="si">#{</span><span class="n">k</span><span class="si">}</span><span class="s2">, user ID: </span><span class="si">#{</span><span class="n">userid</span><span class="si">}</span><span class="s2">, active: </span><span class="si">#{</span><span class="n">active</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;User ID </span><span class="si">#{</span><span class="p">(</span><span class="n">userid</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">?</span> <span class="s2">&quot;is&quot;</span> <span class="p">:</span> <span class="s2">&quot;is not&quot;</span><span class="si">}</span><span class="s2"> greater than zero&quot;</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;User </span><span class="si">#{</span><span class="n">active</span> <span class="p">?</span> <span class="s2">&quot;is&quot;</span> <span class="p">:</span> <span class="s2">&quot;is not&quot;</span><span class="si">}</span><span class="s2"> active&quot;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># Ruby&#39;s much more flexible notion of truthiness makes the tests above somewhat less</span>
+</span><span class='line'>  <span class="c1"># compelling.  For extra validation we add the following</span>
+</span><span class='line'>  <span class="s2">&quot;Oops, it&#39;s not a number&quot;</span> <span class="k">unless</span> <span class="n">userid</span><span class="o">.</span><span class="n">is_a?</span> <span class="no">Fixnum</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<pre><code>[varese 1.8]$ ruby get_employee_data.rb
+Username: 5gGh9anHwFINpr5t, user ID: 459, active: true
+User ID is greater than zero
+User is active
+Username: 76v8iEJcc79Huj9L, user ID: 469, active: false
+User ID is greater than zero
+User is not active
+...
+</code></pre>
+
+<p>This code meets our basic requirement, but as always there were a few stumbling blocks along the way. Avro includes strings as a primitive type, but unfortunately the Java API (which we leverage for our Clojure code) returns string instances as a Utf8 type. We can get a java.lang.String from these objects, but unfortunately we need another toString() method call that (logically) is completely unnecessary. We also don&#8217;t fully support complex types. The Avro code maps the Clojure classes representing arrays and maps onto a &#8220;record&#8221; type that includes the various fields exposed via getters. Supporting these types requires the ability to reconstruct the underlying object based on these fields, and doing so reliably is beyond the scope of this work. Finally, we were forced to use Ruby 1.8.x for the Ruby examples since the Avro gem apparently doesn&#8217;t yet support 1.9.</p>
 ]]></content>
   </entry>
   

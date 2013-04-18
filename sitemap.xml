@@ -46,6 +46,12 @@
     </url>
     <url>
         <loc>
+            http://absurdfarce.github.com/blog/2011/09/02/cassandra-and-clojure-things-to-bytes-and-back-again/
+        </loc>
+        <lastmod>2013-04-18T00:38:06-05:00</lastmod>
+    </url>
+    <url>
+        <loc>
             http://absurdfarce.github.com/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/
         </loc>
         <lastmod>2013-04-11T00:56:33-05:00</lastmod>
@@ -56,7 +62,7 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/blog/archives/</loc>
-        <lastmod>2013-04-17T23:58:56-05:00</lastmod>
+        <lastmod>2013-04-18T00:38:06-05:00</lastmod>
     </url>
     <url>
         <loc>http://absurdfarce.github.com/robots.txt</loc>
@@ -64,6 +70,6 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/</loc>
-        <lastmod>2013-04-17T23:58:56-05:00</lastmod>
+        <lastmod>2013-04-18T00:38:06-05:00</lastmod>
     </url>
 </urlset>
