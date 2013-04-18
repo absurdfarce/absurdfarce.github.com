@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: scala concurrency fork_join clojure | Absurdity and Farce]]></title>
+  <link href="http://absurdfarce.github.com/blog/categories/scala-concurrency-fork-join-clojure/atom.xml" rel="self"/>
+  <link href="http://absurdfarce.github.com/"/>
+  <updated>2013-04-17T23:07:10-05:00</updated>
+  <id>http://absurdfarce.github.com/</id>
+  <author>
+    <name><![CDATA[Bret McGuire]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Forks and Joins in Scala]]></title>
+    <link href="http://absurdfarce.github.com/blog/2011/02/04/forks-and-joins-in-scala/"/>
+    <updated>2011-02-04T12:00:00-06:00</updated>
+    <id>http://absurdfarce.github.com/blog/2011/02/04/forks-and-joins-in-scala</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2011/02/forks-and-joins-in-scala.html">Heuristic Fencepost</a></p>
+
+<p>A short while ago Alex Miller (aka puredanger) wrote up a <a href="http://tech.puredanger.com/2011/01/04/forkjoin-clojure">blog entry</a> detailing how to use Clojure to interact with the new fork/join concurrency framework to be included with Java7 (and already available from Doug Lea's site). The meat of Alex's solution is a Java wrapper for Clojure's IFn type which integrates nicely with the fork/join framework. At the time there was some discussion about whether a Scala implementation would require an equivalent amount of scaffolding. It turns out that supporting this functionality in Scala requires a bit more effort than one might expect, although the problems one faces are quite different than what Alex worked through in Clojure. We review the steps to a working Scala implementation and see what we can learn from them.</p>
+
+<p>Before we move on, a few notes about fork/join itself. A full overview is outside the scope of this post, however details can be found in the <a href="http://gee.cs.oswego.edu/dl/concurrency-interest/index.html">jsr166y section of Doug Lea's site</a>. A solid (although slightly out-of-date) review can be found in a <a href="http://www.ibm.com/developerworks/java/library/j-jtp11137/index.html">developerWorks article</a> by Brian Goetz.</p>
+
+<p>We begin as simply as possible; a straight port of Alex's code (in this case an implementation of Fibonacci using fork/join) to Scala. We create a named function fib that will be recursively called by our RecursiveTasks. We also use an implicit conversion to map no-arg anonymous functions onto RecursiveTask instances using the <a href="http://absurdfarce.github.io/blog/2011/01/07/transmutation-of-scala-closures-into-sam-instances/">technique for supporting SAM interfaces</a> discussed in an earlier post. The resulting code looks pretty good:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">package</span> <span class="nn">org.fencepost.forkjoin</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">jsr166y._&lt;/p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">org.scalatest.Suite</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">class</span> <span class="nc">ForkJoinTestFailOne</span> <span class="k">extends</span> <span class="nc">Suite</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">fn2wrapper</span><span class="o">(</span><span class="n">fn</span><span class="k">:</span><span class="o">()=&gt;</span><span class="nc">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">RecursiveTask</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">return</span> <span class="k">new</span> <span class="nc">RecursiveTask</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="o">{</span> <span class="k">override</span> <span class="k">def</span> <span class="n">compute</span> <span class="k">=</span> <span class="n">fn</span><span class="o">.</span><span class="n">apply</span> <span class="o">}</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">def</span> <span class="n">testFibonacci</span><span class="o">()</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">def</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">Int</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">n</span> <span class="o">&amp;</span><span class="n">lt</span><span class="o">;</span><span class="k">=</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">n</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">f1</span> <span class="k">=</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'>  <span class="n">f1</span> <span class="n">fork</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">f2</span> <span class="k">=</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">2</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'>  <span class="o">(</span><span class="n">f2</span> <span class="n">compute</span><span class="o">)</span> <span class="o">+</span> <span class="o">(</span><span class="n">f1</span> <span class="n">join</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">val</span> <span class="n">pool</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ForkJoinPool</span><span class="o">()</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">1</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">2</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">3</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">2</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">3</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">5</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">6</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">8</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">7</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">13</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Unfortunately an attempt to build with sbt gives an unexpected error:</p>
+
+<pre><code>[info] == test-compile ==
+[info]   Source analysis: 2 new/modified, 0 indirectly invalidated, 0 removed.
+[info] Compiling test sources...
+[error] .../src/test/scala/org/fencepost/forkjoin/ForkJoinTestFailOne.scala:23: method compute cannot be accessed in jsr166y.RecursiveTask[Int]
+[error]       (f2 compute) + (f1 join)
+[error]           ^
+[error] one error found
+</code></pre>
+
+<p>A bit of investigation reveals the problem; RecursiveTask.compute() is a protected abstract method in the fork/join framework. The compute method in the class returned by our implicit conversion consists of nothing more than a call to fib.apply() but there's no way to know this when fib is defined. It follows that an attempt to access RecursiveTask.compute() from within the body of fib is (correctly) understood as an attempt to access a protected method.</p>
+
+<p>How does Alex get around this problem in Clojure? He doesn't; the problem is actually resolved via the Java wrapper. Note that in his Java code compute() has been "elevated" to be a public method. He's thus able to call this method without issue from his "fib-task" function. Without this modification his code fails with similar errors [1].</p>
+
+<p>Strangely, there's no obvious way to resolve this issue within Scala itself. The language provides protected and private keywords to restrict access to certain methods but there is no public keyword; methods are assumed to be public if not annotated otherwise. As a consequence there's no obvious way to "raise" the access level of a method in a subclass. We work around this constraint by way of an egregious hack; we define a new subclass of RecursiveTask containing a surrogate method that provides public access to compute. We then return this subclass from our implicit conversion.</p>
+
+<p>Our new implementation looks like this:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">package</span> <span class="nn">org.fencepost.forkjoin</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">jsr166y._&lt;/p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">org.scalatest.Suite</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">class</span> <span class="nc">ForkJoinTestFailTwo</span> <span class="k">extends</span> <span class="nc">Suite</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">class</span> <span class="nc">Wrapper</span><span class="o">&lt;</span><span class="n">a</span> <span class="n">href</span><span class="o">=</span><span class="s">&quot;somefunc:(&quot;</span><span class="o">&gt;</span><span class="n">T</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;=&gt;</span><span class="n">T</span><span class="o">)</span> <span class="k">extends</span> <span class="nc">RecursiveTask</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">override</span> <span class="k">def</span> <span class="n">compute</span> <span class="k">=</span> <span class="n">somefunc</span><span class="o">.</span><span class="n">apply</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// RecursiveTask.compute() is protected and there&#39;s no obvious way to</span>
+</span><span class='line'><span class="c1">// elevate it&#39;s access level within a Scala class definition.  The type</span>
+</span><span class='line'><span class="c1">// system (very correctly) doesn&#39;t allow a random function access to</span>
+</span><span class='line'><span class="c1">// protected methods of a class even when that method is invoked by</span>
+</span><span class='line'><span class="c1">// a method within the class itself.  Defining a new method with standard</span>
+</span><span class='line'><span class="c1">// access resolves the issue.</span>
+</span><span class='line'><span class="k">def</span> <span class="n">surrogate</span> <span class="k">=</span> <span class="n">compute</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">fn2wrapper</span><span class="o">(</span><span class="n">fn</span><span class="k">:</span><span class="o">()=&gt;</span><span class="nc">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">Wrapper</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">return</span> <span class="k">new</span> <span class="nc">Wrapper</span><span class="o">[</span><span class="kt">Int</span><span class="o">](</span><span class="n">fn</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">def</span> <span class="n">testFibonacci</span><span class="o">()</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">def</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">Int</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">n</span> <span class="o">&amp;</span><span class="n">lt</span><span class="o">;</span><span class="k">=</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">n</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">f1</span> <span class="k">=</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'>  <span class="n">f1</span> <span class="n">fork</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">f2</span> <span class="k">=</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">2</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'>  <span class="o">(</span><span class="n">f2</span> <span class="n">compute</span><span class="o">)</span> <span class="o">+</span> <span class="o">(</span><span class="n">f1</span> <span class="n">join</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">val</span> <span class="n">pool</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ForkJoinPool</span><span class="o">()</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">1</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">2</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">3</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">2</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">3</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">5</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">6</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">8</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">7</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">13</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>This code now compiles, but when we try to actually execute the test with sbt we see a curious error; the test starts up and then simply hangs:</p>
+
+<pre><code>[info] == test-compile ==
+[info] 
+[info] == copy-test-resources ==
+[info] == copy-test-resources ==
+[info] 
+[info] == test-start ==
+[info] == test-start ==
+[info] 
+[info] == org.fencepost.forkjoin.ForkJoinTestFailTwo ==
+[info] Test Starting: testFibonacci
+*wait for a long, long time*
+</code></pre>
+
+<p>Well, this isn't good. What's going on here?</p>
+
+<p>The key point to understand is that the implicit conversion is called every time an existing value needs to be converted to a different type. As written the calls to f1.fork() and f1.join() both require conversion, and the implicit conversion function in play here will return a new instance on each invocation. This means that even though the input to the conversion function is identical in both cases (f1) the object that invokes fork() will be a different object than that which invokes join(). For fork/join tasks this matters; join() is called on an object that was never forked(). Voila, an unterminated wait.</p>
+
+<p>We can resolve this issue one of two ways:</p>
+
+<ul>
+<li>Caching previous values returned by the implicit conversion function and re-using them when appropriate</li>
+<li>Explicitly specifying the type of f1 and f2 as our wrapper subclass. This has the effect of forcing implicit conversion at the time of assignment rather than when we call fork() and join()</li>
+</ul>
+
+
+<p>I chose the first approach, mainly because it seemed a bit cooler. Oh, and it's a bit cleaner logically as well. The final result runs without issue:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">package</span> <span class="nn">org.fencepost.forkjoin</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">scala.collection.mutable.LinkedList</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">jsr166y._&lt;/p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">import</span> <span class="nn">org.scalatest.Suite</span><span class="o">&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span><span class="k">class</span> <span class="nc">ForkJoinTest</span> <span class="k">extends</span> <span class="nc">Suite</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">val</span> <span class="n">cache</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">LinkedList</span><span class="o">&lt;</span><span class="n">a</span> <span class="n">href</span><span class="o">=</span><span class="s">&quot;&quot;</span><span class="o">&gt;(()</span><span class="k">=&gt;</span><span class="nc">Int</span><span class="o">,</span><span class="nc">Wrapper</span><span class="o">[</span><span class="kt">Int</span><span class="o">])&lt;/</span><span class="n">a</span><span class="o">&gt;&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">class</span> <span class="nc">Wrapper</span><span class="o">&lt;</span><span class="n">a</span> <span class="n">href</span><span class="o">=</span><span class="s">&quot;somefunc:(&quot;</span><span class="o">&gt;</span><span class="n">T</span><span class="o">&lt;/</span><span class="n">a</span><span class="o">&gt;=&gt;</span><span class="n">T</span><span class="o">)</span> <span class="k">extends</span> <span class="nc">RecursiveTask</span><span class="o">[</span><span class="kt">T</span><span class="o">]</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">override</span> <span class="k">def</span> <span class="n">compute</span> <span class="k">=</span> <span class="n">somefunc</span><span class="o">.</span><span class="n">apply</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// RecursiveTask.compute() is protected and there&#39;s no obvious way to</span>
+</span><span class='line'><span class="c1">// elevate it&#39;s access level within a Scala class definition.  The type</span>
+</span><span class='line'><span class="c1">// system (very correctly) doesn&#39;t allow a random function access to</span>
+</span><span class='line'><span class="c1">// protected methods of a class even when that method is invoked by</span>
+</span><span class='line'><span class="c1">// a method within the class itself.  Defining a new method with standard</span>
+</span><span class='line'><span class="c1">// access resolves the issue.</span>
+</span><span class='line'><span class="k">def</span> <span class="n">surrogate</span> <span class="k">=</span> <span class="n">compute</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="c1">// Rationale for a caching implicit conversion can be found below.  We use</span>
+</span><span class='line'>  <span class="c1">// a list of tuples rather than a map since hashing buys us nothing here;</span>
+</span><span class='line'>  <span class="c1">// there is always one (and exactly one) object with a given object identity.</span>
+</span><span class='line'>  <span class="k">implicit</span> <span class="k">def</span> <span class="n">fn2wrapper</span><span class="o">(</span><span class="n">fn</span><span class="k">:</span><span class="o">()=&gt;</span><span class="nc">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">Wrapper</span><span class="o">[</span><span class="kt">Int</span><span class="o">]</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">val</span> <span class="n">cacheval</span> <span class="k">=</span> <span class="n">cache</span> <span class="n">find</span> <span class="o">(</span><span class="n">t</span> <span class="o">=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="o">(</span><span class="n">t</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">)</span> <span class="o">&amp;</span><span class="n">amp</span><span class="o">;&amp;</span><span class="n">amp</span><span class="o">;</span> <span class="o">(</span><span class="n">t</span><span class="o">.</span><span class="n">_1</span> <span class="n">eq</span> <span class="n">fn</span><span class="o">))</span>
+</span><span class='line'><span class="n">cacheval</span> <span class="k">match</span> <span class="o">{</span>
+</span><span class='line'>  <span class="k">case</span> <span class="nc">Some</span><span class="o">((</span><span class="k">_</span><span class="o">,</span><span class="n">cval</span><span class="o">))</span> <span class="o">=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">cval</span>
+</span><span class='line'>  <span class="k">case</span> <span class="nc">None</span> <span class="o">=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="k">val</span> <span class="n">newcval</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">Wrapper</span><span class="o">[</span><span class="kt">Int</span><span class="o">](</span><span class="n">fn</span><span class="o">)</span>
+</span><span class='line'>      <span class="n">cache</span><span class="o">.</span><span class="n">next</span> <span class="k">=</span> <span class="n">cache</span><span class="o">.</span><span class="n">next</span> <span class="o">:+</span> <span class="o">(</span><span class="n">fn</span><span class="o">,</span><span class="n">newcval</span><span class="o">)</span>
+</span><span class='line'>      <span class="n">newcval</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="k">def</span> <span class="n">testFibonacci</span><span class="o">()</span> <span class="k">=</span> <span class="o">{&lt;/</span><span class="n">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">def</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span><span class="k">:</span><span class="kt">Int</span><span class="o">)</span><span class="k">:</span><span class="kt">Int</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">if</span> <span class="o">(</span><span class="n">n</span> <span class="o">&amp;</span><span class="n">lt</span><span class="o">;</span><span class="k">=</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">return</span> <span class="n">n</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// The approach used here only works if our implicit conversion always</span>
+</span><span class='line'>  <span class="c1">// returns the same Wrapper instance for a given function.  For a given</span>
+</span><span class='line'>  <span class="c1">// RecursiveTask instance join() must be called on the same instance that</span>
+</span><span class='line'>  <span class="c1">// originally called fork().  It follows that an implicit conversion such</span>
+</span><span class='line'>  <span class="c1">// as:</span>
+</span><span class='line'>  <span class="c1">//</span>
+</span><span class='line'>  <span class="c1">// implicit def fn2wrapper(fn:()=&amp;gt;Int):Wrapper[Int] = {</span>
+</span><span class='line'>  <span class="c1">//    return new Wrapper(fn)</span>
+</span><span class='line'>  <span class="c1">// }</span>
+</span><span class='line'>  <span class="c1">//</span>
+</span><span class='line'>  <span class="c1">// won&#39;t be adequate; fork() and join() will be called on two separate</span>
+</span><span class='line'>  <span class="c1">// objects (since implicit conversion is performed on each method call)</span>
+</span><span class='line'>  <span class="c1">// and join() will never return.</span>
+</span><span class='line'>  <span class="c1">//</span>
+</span><span class='line'>  <span class="c1">// Alternately we can force conversion when f1 and f2 are assigned values</span>
+</span><span class='line'>  <span class="c1">// using something like the following;</span>
+</span><span class='line'>  <span class="c1">//</span>
+</span><span class='line'>  <span class="c1">// val f1:Wrapper[Int] = { ()=&amp;gt; fib(n - 1) }</span>
+</span><span class='line'>  <span class="c1">// val f2:Wrapper[Int] = { ()=&amp;gt; fib(n - 2) }</span>
+</span><span class='line'>  <span class="c1">//</span>
+</span><span class='line'>  <span class="c1">// Clearly in this case f1.fork() and f1.join() will be called on the</span>
+</span><span class='line'>  <span class="c1">// same instance of a RecursiveTask subclass.</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">f1</span> <span class="k">=</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'>  <span class="n">f1</span> <span class="n">fork</span>
+</span><span class='line'>  <span class="k">val</span> <span class="n">f2</span> <span class="k">=</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">2</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'>  <span class="o">(</span><span class="n">f2</span> <span class="n">surrogate</span><span class="o">)</span> <span class="o">+</span> <span class="o">(</span><span class="n">f1</span> <span class="n">join</span><span class="o">)</span>
+</span><span class='line'><span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>
+</span><span class='line'><span class="k">val</span> <span class="n">pool</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ForkJoinPool</span><span class="o">()</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">1</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">2</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">1</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">3</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">2</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">4</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">3</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">5</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">5</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">6</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">8</span><span class="o">)</span>
+</span><span class='line'><span class="n">assert</span> <span class="o">((</span><span class="n">pool</span> <span class="n">invoke</span> <span class="o">{</span> <span class="o">()=&amp;</span><span class="n">gt</span><span class="o">;</span> <span class="n">fib</span><span class="o">(</span><span class="mi">7</span><span class="o">)</span> <span class="o">})</span> <span class="o">==</span> <span class="mi">13</span><span class="o">)</span>
+</span><span class='line'><span class="o">&lt;/</span><span class="n">code</span><span class="o">&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">p</span><span class="o">&gt;</span>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>[1] Using Alex's code (as published on his blog):</p>
+
+<p>bartok ~/git/puredanger_forkjoin $ clojure process.clj
+(1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597 2584 4181)</p>
+
+<p>After changing IFnTask.compute() to protected (with no other changes):</p>
+
+<pre><code>bartok ~/git/puredanger_forkjoin $ clojure process.clj 
+(Exception in thread "main" java.lang.reflect.InvocationTargetException
+ at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+ at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+ at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+ at java.lang.reflect.Method.invoke(Method.java:616)
+ at jline.ConsoleRunner.main(Unknown Source)
+Caused by: java.lang.RuntimeException: java.lang.IllegalArgumentException: No matching field found: compute for class revelytix.federator.process.IFnTask (process.clj:0)
+ at clojure.lang.Compiler.eval(Compiler.java:5440)
+ at clojure.lang.Compiler.load(Compiler.java:5857)
+ at clojure.lang.Compiler.loadFile(Compiler.java:5820)
+ at clojure.main$load_script.invoke(main.clj:221)
+ at clojure.main$script_opt.invoke(main.clj:273)
+</code></pre>
+]]></content>
+  </entry>
+  
+</feed>

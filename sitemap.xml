@@ -31,6 +31,10 @@
         <lastmod>2013-04-15T23:29:17-05:00</lastmod>
     </url>
     <url>
+        <loc>http://absurdfarce.github.com/blog/2011/02/04/forks-and-joins-in-scala/</loc>
+        <lastmod>2013-04-17T23:06:25-05:00</lastmod>
+    </url>
+    <url>
         <loc>
             http://absurdfarce.github.com/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/
         </loc>
@@ -42,7 +46,7 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/blog/archives/</loc>
-        <lastmod>2013-04-15T23:29:17-05:00</lastmod>
+        <lastmod>2013-04-17T23:06:25-05:00</lastmod>
     </url>
     <url>
         <loc>http://absurdfarce.github.com/robots.txt</loc>
@@ -50,6 +54,6 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/</loc>
-        <lastmod>2013-04-15T23:29:17-05:00</lastmod>
+        <lastmod>2013-04-17T23:06:25-05:00</lastmod>
     </url>
 </urlset>
