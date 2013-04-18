@@ -4,7 +4,7 @@
   <title><![CDATA[Category: cassandra python | Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/blog/categories/cassandra-python/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-04-17T23:57:30-05:00</updated>
+  <updated>2013-04-17T23:59:09-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -213,7 +213,7 @@ cassandra
 
 <p>Some spot checking of these results using the Twitter Web interface seems to confirm the results.</p>
 
-<h1>POPULATING THE DATA</h1>
+<h2>POPULATING THE DATA</h2>
 
 <p>So far we've talked about accessing data from a Cassandra instance that has already been populated with the data we need. But how do we get it in there in the first place? The answer to this question is a two-step process; first we create the relevant structures within Cassandra and then we use our Python tools to gather and add the actual data.</p>
 
