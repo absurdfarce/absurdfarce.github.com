@@ -4,7 +4,7 @@
   <title><![CDATA[Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-04-17T23:09:08-05:00</updated>
+  <updated>2013-04-17T23:22:41-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -421,6 +421,342 @@
 <p>[2] A purist might object that Scala is designed to mix features of object-oriented and functional languages, but the bias in favor of functional constructs justifies Scala&#8217;s inclusion here.</p>
 
 <p>[3] As an example, note that in Haskell list comprehensions can be replaced with do-notation. See the Haskell wiki for details.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Cassandra and Clojure: The Beginning of a Beautiful Friendship]]></title>
+    <link href="http://absurdfarce.github.com/blog/2011/05/24/cassandra-and-clojure-the-beginning-of-a-beautiful-friendship/"/>
+    <updated>2011-05-24T12:00:00-05:00</updated>
+    <id>http://absurdfarce.github.com/blog/2011/05/24/cassandra-and-clojure-the-beginning-of-a-beautiful-friendship</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2011/05/cassandra-and-clojure-beginning-of.html">Heuristic Fencepost</a></p>
+
+<p>Soon after I began working with <a href="http://cassandra.apache.org">Cassandra</a> it became clear to me that if you were in the market for a platform for creating applications that interact with this database you could do a lot worse than <a href="http://clojure.org">Clojure</a>. The lack of a query language [1] suggests that filtering and slicing lists of keys and columns might be a fairly common activity for apps powered by Cassandra. And while many languages support the map/filter/reduce paradigm Clojure&#8217;s use of <a href="http://clojure.org/sequences">sequences</a> throughout the core suggest a natural means to integrate this data into the rest of your application.</p>
+
+<p>Cassandra itself provides an <a href="http://wiki.apache.org/cassandra/API">API</a> that uses the <a href="http://thrift.apache.org">Thrift</a> protocol for manipulating data. We&#8217;ll use this interface to implement a simple proof-of-concept application that might serve as a testbed for manipulating data managed by Cassandra in idiomatic Clojure. Note that the Clojure ecosystem already includes several open-source projects that connect Clojure to Cassandra: these include <a href="https://github.com/robertluo/clj-cassandra">clj-cassandra</a> and <a href="https://github.com/pingles/clj-hector">clj-hector</a>, the latter leveraging the Hector Java client to do it&#8217;s work. In order to keep things simple we choose to avoid any of these third-party libraries; it&#8217;s not as if the Thrift interface imposes a heavy burden on us. Let&#8217;s see how far we can get with what&#8217;s already in the packaging.</p>
+
+<p>That sounds great&#8230; so what exactly are we trying to do? Beginning with the database generated during our previous work with Cassandra we should be able to access sets of keys within a keyspace and a set of columns for any specific key. These structures should be available for manipulation in idiomatic Clojure as sequences. Ideally these sequences would be at least somewhat lazy and transparently support multiple datatypes. [2]</p>
+
+<p>Using the Thrift interface requires working with a fair number of Java objects representing return types and/or arguments to the various exposed functions. My Clojure isn&#8217;t yet solid enough to hash out Java interop code without flailing a bit so we kick things off with a Scala implementation. This approach allows us to simplify the interop problem without sacrificing the functional approach, all within a language that is by now fairly familiar.</p>
+
+<p>The Scala code includes a fair number of intermediate objects but is otherwise fairly clean:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+</pre></td><td class='code'><pre><code class='scala'><span class='line'><span class="k">package</span> <span class="nn">org.fencepost.cassandra</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">import</span> <span class="nn">scala.collection.JavaConversions</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">import</span> <span class="nn">org.apache.thrift.protocol.TBinaryProtocol</span>
+</span><span class='line'><span class="k">import</span> <span class="nn">org.apache.thrift.transport._</span>
+</span><span class='line'><span class="k">import</span> <span class="nn">org.apache.cassandra.service._</span>
+</span><span class='line'><span class="k">import</span> <span class="nn">org.apache.cassandra.thrift._</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">object</span> <span class="nc">ThriftCassandraClient</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="n">connect</span><span class="o">(</span><span class="n">host</span><span class="k">:</span><span class="kt">String</span><span class="o">,</span><span class="n">port</span><span class="k">:</span><span class="kt">Int</span><span class="o">,</span><span class="n">keyspace</span><span class="k">:</span><span class="kt">String</span><span class="o">)</span><span class="k">:</span><span class="kt">Cassandra.Client</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">val</span> <span class="n">transport</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">TFramedTransport</span><span class="o">(</span><span class="k">new</span> <span class="nc">TSocket</span><span class="o">(</span><span class="n">host</span><span class="o">,</span> <span class="n">port</span><span class="o">))</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">protocol</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">TBinaryProtocol</span><span class="o">(</span><span class="n">transport</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">client</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">Cassandra</span><span class="o">.</span><span class="nc">Client</span><span class="o">(</span><span class="n">protocol</span><span class="o">)</span>
+</span><span class='line'>    <span class="n">transport</span><span class="o">.</span><span class="n">open</span><span class="o">()</span>
+</span><span class='line'>    <span class="n">client</span> <span class="n">set_keyspace</span> <span class="n">keyspace</span>
+</span><span class='line'>    <span class="n">client</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// Execute a range slice query against the specified Cassandra instance.  Method returns</span>
+</span><span class='line'>  <span class="c1">// an object suitable for later interrogation by range_slices_keys() or range_slices_columns()</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">get_range_slices</span><span class="o">(</span><span class="n">client</span><span class="k">:</span><span class="kt">Cassandra.Client</span><span class="o">,</span><span class="n">cf</span><span class="k">:</span><span class="kt">String</span><span class="o">,</span><span class="n">start</span><span class="k">:</span><span class="kt">String</span><span class="o">,</span><span class="n">end</span><span class="k">:</span><span class="kt">String</span><span class="o">)</span><span class="k">:</span><span class="kt">Iterable</span><span class="o">[</span><span class="kt">KeySlice</span><span class="o">]</span> <span class="k">=</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">val</span> <span class="n">sliceRange</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">SliceRange</span><span class="o">()</span>
+</span><span class='line'>    <span class="n">sliceRange</span> <span class="n">setStart</span> <span class="k">new</span> <span class="nc">Array</span><span class="o">[</span><span class="kt">Byte</span><span class="o">](</span><span class="mi">0</span><span class="o">)</span>
+</span><span class='line'>    <span class="n">sliceRange</span> <span class="n">setFinish</span> <span class="k">new</span> <span class="nc">Array</span><span class="o">[</span><span class="kt">Byte</span><span class="o">](</span><span class="mi">0</span><span class="o">)</span>
+</span><span class='line'>    <span class="n">sliceRange</span> <span class="n">setReversed</span> <span class="kc">false</span>
+</span><span class='line'>    <span class="n">sliceRange</span> <span class="n">setCount</span> <span class="mi">100</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">slicePredicate</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">SlicePredicate</span><span class="o">()</span>
+</span><span class='line'>    <span class="n">slicePredicate</span> <span class="n">setSlice_range</span> <span class="n">sliceRange</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">columnParent</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">ColumnParent</span><span class="o">(</span><span class="n">cf</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">keyRange</span> <span class="k">=</span> <span class="k">new</span> <span class="nc">KeyRange</span><span class="o">()</span>
+</span><span class='line'>    <span class="n">keyRange</span> <span class="n">setStart_key</span> <span class="o">(</span><span class="n">start</span> <span class="n">getBytes</span><span class="o">)</span>
+</span><span class='line'>    <span class="n">keyRange</span> <span class="n">setEnd_key</span> <span class="o">(</span><span class="n">end</span> <span class="n">getBytes</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">val</span> <span class="n">javakeys</span> <span class="k">=</span> <span class="n">client</span><span class="o">.</span><span class="n">get_range_slices</span><span class="o">(</span><span class="n">columnParent</span><span class="o">,</span><span class="n">slicePredicate</span><span class="o">,</span><span class="n">keyRange</span><span class="o">,</span><span class="nc">ConsistencyLevel</span><span class="o">.</span><span class="nc">ONE</span><span class="o">)</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1">// Return from Thrift Java client is List&lt;KeySlice&gt; so we have to explicitly convert it here</span>
+</span><span class='line'>    <span class="nc">JavaConversions</span> <span class="n">asScalaIterable</span> <span class="n">javakeys</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// Return an Iterable for all keys in an input query state object</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">range_slices_keys</span><span class="o">(</span><span class="n">slices</span><span class="k">:</span><span class="kt">Iterable</span><span class="o">[</span><span class="kt">KeySlice</span><span class="o">])</span> <span class="k">=</span> <span class="n">slices</span> <span class="n">map</span> <span class="o">{</span> <span class="n">c</span> <span class="k">=&gt;</span> <span class="k">new</span> <span class="nc">String</span><span class="o">(</span><span class="n">c</span><span class="o">.</span><span class="n">getKey</span><span class="o">)</span> <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// Return an Option containing column information for the specified key in the input query</span>
+</span><span class='line'>  <span class="c1">// state object.  If the key isn&#39;t found None is returned, otherwise the Option contains a</span>
+</span><span class='line'>  <span class="c1">// map of column names to column values.</span>
+</span><span class='line'>  <span class="k">def</span> <span class="n">range_slices_columns</span><span class="o">(</span><span class="n">slices</span><span class="k">:</span><span class="kt">Iterable</span><span class="o">[</span><span class="kt">KeySlice</span><span class="o">],</span> <span class="n">key</span><span class="k">:</span><span class="kt">String</span><span class="o">)</span><span class="k">:</span><span class="kt">Option</span><span class="o">[</span><span class="kt">Map</span><span class="o">[</span><span class="kt">String</span>,<span class="kt">String</span><span class="o">]]</span> <span class="k">=</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="n">slices</span> <span class="n">find</span> <span class="o">{</span> <span class="n">c</span> <span class="k">=&gt;</span> <span class="k">new</span> <span class="nc">String</span><span class="o">(</span><span class="n">c</span><span class="o">.</span><span class="n">getKey</span><span class="o">())</span> <span class="o">==</span> <span class="n">key</span> <span class="o">}</span> <span class="k">match</span> <span class="o">{</span>
+</span><span class='line'>      <span class="k">case</span> <span class="nc">None</span> <span class="k">=&gt;</span> <span class="nc">None</span>
+</span><span class='line'>      <span class="k">case</span> <span class="nc">Some</span><span class="o">(</span><span class="n">keyval</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span><span class='line'>
+</span><span class='line'>        <span class="k">val</span> <span class="n">urcols</span> <span class="k">=</span> <span class="nc">JavaConversions</span> <span class="n">asScalaIterable</span> <span class="o">(</span><span class="n">keyval</span> <span class="n">getColumns</span><span class="o">)</span>
+</span><span class='line'>        <span class="k">val</span> <span class="n">cols</span><span class="k">:</span><span class="kt">Seq</span><span class="o">[</span><span class="kt">Column</span><span class="o">]</span> <span class="k">=</span> <span class="o">(</span><span class="n">urcols</span> <span class="n">map</span> <span class="o">(</span><span class="k">_</span> <span class="n">getColumn</span><span class="o">)).</span><span class="n">toSeq</span>
+</span><span class='line'>        <span class="nc">Some</span><span class="o">(</span><span class="nc">Map</span><span class="o">(</span><span class="n">cols</span> <span class="n">map</span> <span class="o">{</span> <span class="n">c</span> <span class="k">=&gt;</span> <span class="o">(</span><span class="k">new</span> <span class="nc">String</span><span class="o">(</span><span class="n">c</span><span class="o">.</span><span class="n">getName</span><span class="o">()))</span> <span class="o">-&gt;</span> <span class="o">(</span><span class="k">new</span> <span class="nc">String</span><span class="o">(</span><span class="n">c</span><span class="o">.</span><span class="n">getValue</span><span class="o">()))</span> <span class="o">}</span><span class="k">:_</span><span class="kt">*</span><span class="o">))</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="n">main</span><span class="o">(</span><span class="n">args</span><span class="k">:</span> <span class="kt">Array</span><span class="o">[</span><span class="kt">String</span><span class="o">])</span><span class="k">:</span> <span class="kt">Unit</span> <span class="o">=</span> <span class="o">{</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="k">val</span> <span class="n">client</span> <span class="k">=</span> <span class="n">connect</span><span class="o">(</span><span class="s">&quot;localhost&quot;</span><span class="o">,</span> <span class="mi">9160</span><span class="o">,</span><span class="s">&quot;twitter&quot;</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">slices</span> <span class="k">=</span> <span class="n">get_range_slices</span><span class="o">(</span><span class="n">client</span><span class="o">,</span><span class="s">&quot;authors&quot;</span><span class="o">,</span><span class="s">&quot;!&quot;</span><span class="o">,</span><span class="s">&quot;~&quot;</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">val</span> <span class="n">fivekeys</span> <span class="k">=</span> <span class="n">range_slices_keys</span><span class="o">(</span><span class="n">slices</span><span class="o">)</span> <span class="n">take</span> <span class="mi">5</span>
+</span><span class='line'>    <span class="n">println</span><span class="o">(</span><span class="s">&quot;fivekeys: &quot;</span> <span class="o">+</span> <span class="n">fivekeys</span><span class="o">)</span>
+</span><span class='line'>    <span class="k">for</span> <span class="o">(</span><span class="n">key</span> <span class="k">&lt;-</span> <span class="n">fivekeys</span><span class="o">)</span> <span class="o">{</span>
+</span><span class='line'>      <span class="n">range_slices_columns</span><span class="o">(</span><span class="n">slices</span><span class="o">,</span><span class="n">key</span><span class="o">)</span> <span class="k">match</span> <span class="o">{</span>
+</span><span class='line'>        <span class="k">case</span> <span class="nc">None</span> <span class="k">=&gt;</span>
+</span><span class='line'>        <span class="k">case</span> <span class="nc">Some</span><span class="o">(</span><span class="n">cols</span><span class="o">)</span> <span class="k">=&gt;</span>
+</span><span class='line'>          <span class="n">println</span><span class="o">(</span>
+</span><span class='line'>            <span class="s">&quot;Key &quot;</span> <span class="o">+</span> <span class="n">key</span> <span class="o">+</span>
+</span><span class='line'>            <span class="s">&quot;: name =&gt; &quot;</span> <span class="o">+</span> <span class="o">(</span><span class="n">cols</span> <span class="n">getOrElse</span> <span class="o">(</span><span class="s">&quot;name&quot;</span><span class="o">,</span><span class="s">&quot;&quot;</span><span class="o">))</span> <span class="o">+</span>
+</span><span class='line'>            <span class="s">&quot;, following =&gt; &quot;</span> <span class="o">+</span> <span class="o">(</span><span class="n">cols</span> <span class="n">getOrElse</span> <span class="o">(</span><span class="s">&quot;following&quot;</span><span class="o">,</span><span class="s">&quot;&quot;</span><span class="o">))</span>
+</span><span class='line'>          <span class="o">)</span>
+</span><span class='line'>      <span class="o">}</span>
+</span><span class='line'>    <span class="o">}</span>
+</span><span class='line'>  <span class="o">}</span>
+</span><span class='line'><span class="o">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Translating this code into Clojure is more straightforward than expected:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="nb">import </span><span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.thrift.transport</span> <span class="nv">TFramedTransport</span> <span class="nv">TSocket</span><span class="p">)</span>
+</span><span class='line'>        <span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.thrift.protocol</span> <span class="nv">TBinaryProtocol</span><span class="p">)</span>
+</span><span class='line'>        <span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.cassandra.thrift</span> <span class="nv">Cassandra$Client</span> <span class="nv">SliceRange</span> <span class="nv">SlicePredicate</span> <span class="nv">ColumnParent</span> <span class="nv">KeyRange</span> <span class="nv">ConsistencyLevel</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">connect</span> <span class="p">[</span><span class="nv">host</span> <span class="nv">port</span> <span class="nv">keyspace</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Connect to a Cassandra instance on the specified host and port.  Set things up to use the specified key space.&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">transport</span> <span class="p">(</span><span class="nf">TFramedTransport.</span> <span class="p">(</span><span class="nf">TSocket.</span> <span class="nv">host</span> <span class="nv">port</span><span class="p">))</span>
+</span><span class='line'>        <span class="nv">protocol</span> <span class="p">(</span><span class="nf">TBinaryProtocol.</span> <span class="nv">transport</span><span class="p">)</span>
+</span><span class='line'>        <span class="nv">client</span> <span class="p">(</span><span class="nf">Cassandra$Client.</span> <span class="nv">protocol</span><span class="p">)]</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.open</span> <span class="nv">transport</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.set_keyspace</span> <span class="nv">client</span> <span class="nv">keyspace</span><span class="p">)</span>
+</span><span class='line'>    <span class="nv">client</span>
+</span><span class='line'>    <span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">get_range_slices</span> <span class="p">[</span><span class="nv">client</span> <span class="nv">cf</span> <span class="nv">start</span> <span class="nv">end</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Simple front end into the get_range_slices function exposed via Thrift&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">slice_range</span>
+</span><span class='line'>        <span class="p">(</span><span class="nb">doto </span><span class="p">(</span><span class="nf">SliceRange.</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setStart</span> <span class="p">(</span><span class="nf">byte-array</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setFinish</span> <span class="p">(</span><span class="nf">byte-array</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setReversed</span> <span class="nv">false</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setCount</span> <span class="mi">100</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">)</span>
+</span><span class='line'>        <span class="nv">slice_predicate</span>
+</span><span class='line'>        <span class="p">(</span><span class="nb">doto </span><span class="p">(</span><span class="nf">SlicePredicate.</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setSlice_range</span> <span class="nv">slice_range</span><span class="p">))</span>
+</span><span class='line'>        <span class="nv">column_parent</span> <span class="p">(</span><span class="nf">ColumnParent.</span> <span class="nv">cf</span><span class="p">)</span>
+</span><span class='line'>        <span class="nv">key_range</span>
+</span><span class='line'>        <span class="p">(</span><span class="nb">doto </span><span class="p">(</span><span class="nf">KeyRange.</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setStart_key</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="nv">start</span><span class="p">))</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">.setEnd_key</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="nv">end</span><span class="p">)))</span>
+</span><span class='line'>        <span class="p">]</span>
+</span><span class='line'>    <span class="p">(</span><span class="nf">.get_range_slices</span> <span class="nv">client</span> <span class="nv">column_parent</span> <span class="nv">slice_predicate</span> <span class="nv">key_range</span> <span class="nv">ConsistencyLevel/ONE</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">range_slices_keys</span> <span class="p">[</span><span class="nv">slices</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Retrieve the set of keys in a get_range_slices result&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">String.</span> <span class="p">(</span><span class="nf">.getKey</span> <span class="nv">%</span><span class="p">))</span> <span class="nv">slices</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">range_slices_columns</span> <span class="p">[</span><span class="nv">slices</span> <span class="nv">key</span><span class="p">]</span>
+</span><span class='line'>  <span class="s">&quot;Retrieve a map of the columns associated with the specified key in a get_range_slices result&quot;</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">match</span> <span class="p">(</span><span class="nb">first </span><span class="p">(</span><span class="nb">filter </span><span class="o">#</span><span class="p">(</span><span class="nb">= key </span><span class="p">(</span><span class="nf">String.</span> <span class="p">(</span><span class="nf">.getKey</span> <span class="nv">%</span><span class="p">)))</span> <span class="nv">slices</span><span class="p">))]</span>
+</span><span class='line'>    <span class="p">(</span><span class="nb">cond </span><span class="p">(</span><span class="nb">nil? </span><span class="nv">match</span><span class="p">)</span> <span class="nv">nil</span>
+</span><span class='line'>          <span class="p">(</span><span class="nb">true? </span><span class="nv">true</span><span class="p">)</span>
+</span><span class='line'>          <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">urcols</span> <span class="p">(</span><span class="nf">.getColumns</span> <span class="nv">match</span><span class="p">)</span>
+</span><span class='line'>                <span class="nv">cols</span> <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">.getColumn</span> <span class="nv">%</span><span class="p">)</span> <span class="nv">urcols</span><span class="p">)]</span>
+</span><span class='line'>            <span class="p">(</span><span class="nb">zipmap </span><span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nb">keyword </span><span class="p">(</span><span class="nf">String.</span> <span class="p">(</span><span class="nf">.getName</span> <span class="nv">%</span><span class="p">)))</span> <span class="nv">cols</span><span class="p">)</span>
+</span><span class='line'>                    <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">String.</span> <span class="p">(</span><span class="nf">.getValue</span> <span class="nv">%</span><span class="p">))</span> <span class="nv">cols</span><span class="p">))</span>
+</span><span class='line'>            <span class="p">)</span>
+</span><span class='line'>          <span class="p">)</span>
+</span><span class='line'>    <span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">client</span> <span class="p">(</span><span class="nf">connect</span> <span class="s">&quot;localhost&quot;</span> <span class="mi">9160</span> <span class="s">&quot;twitter&quot;</span><span class="p">)</span>
+</span><span class='line'>      <span class="nv">key_slices</span> <span class="p">(</span><span class="nf">get_range_slices</span> <span class="nv">client</span> <span class="s">&quot;authors&quot;</span> <span class="s">&quot;!&quot;</span> <span class="s">&quot;~&quot;</span><span class="p">)</span>
+</span><span class='line'>      <span class="nv">five_keys</span> <span class="p">(</span><span class="nb">take </span><span class="mi">5</span> <span class="p">(</span><span class="nf">range_slices_keys</span> <span class="nv">key_slices</span><span class="p">))]</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="p">(</span><span class="nb">print </span><span class="nv">five_keys</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">formatfn</span>
+</span><span class='line'>        <span class="p">(</span><span class="k">fn </span><span class="p">[</span><span class="nv">key</span><span class="p">]</span>
+</span><span class='line'>          <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">cols</span> <span class="p">(</span><span class="nf">range_slices_columns</span> <span class="nv">key_slices</span> <span class="nv">key</span><span class="p">)]</span>
+</span><span class='line'>            <span class="p">(</span><span class="nf">format</span> <span class="s">&quot;Key %s: name =&gt; %s, following =&gt; %s\n&quot;</span> <span class="nb">key </span><span class="p">(</span><span class="nf">cols</span> <span class="ss">:name</span><span class="p">)</span> <span class="p">(</span><span class="nf">cols</span> <span class="ss">:following</span><span class="p">))</span>
+</span><span class='line'>            <span class="p">)</span>
+</span><span class='line'>          <span class="p">)]</span>
+</span><span class='line'>    <span class="p">(</span><span class="nb">print </span><span class="p">(</span><span class="nb">reduce str </span><span class="p">(</span><span class="nb">map </span><span class="nv">formatfn</span> <span class="nv">five_keys</span><span class="p">)))</span>
+</span><span class='line'>    <span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>These results seem fairly promising, although we&#8217;re nowhere near done. This code assumes that all column names and values are strings, a perfectly ridiculous assumption. We also don&#8217;t offer any support for nested data types, although in fairness this was a failing of our earlier work as well. Finally we haven&#8217;t built in much support for lazy evaluation; we lazily convert column names to Clojure keywords but that&#8217;s about it. But fear not, gentle reader; we&#8217;ll revisit some or all of these points in future work.</p>
+
+<p>[1] At least until <a href="https://issues.apache.org/jira/browse/CASSANDRA-1703">CQL</a> arrives in Cassandra 0.8
+[2] We won&#8217;t be able to meet these last two goals in our initial implementation, but with any luck we&#8217;ll be able to revisit them in future work</p>
 ]]></content>
   </entry>
   
