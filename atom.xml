@@ -4,7 +4,7 @@
   <title><![CDATA[Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-04-18T00:39:19-05:00</updated>
+  <updated>2013-04-30T20:36:57-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -421,6 +421,355 @@
 <p>[2] A purist might object that Scala is designed to mix features of object-oriented and functional languages, but the bias in favor of functional constructs justifies Scala&#8217;s inclusion here.</p>
 
 <p>[3] As an example, note that in Haskell list comprehensions can be replaced with do-notation. See the Haskell wiki for details.</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Ruby and Concurrency: The Mechanics of Akka and JRuby]]></title>
+    <link href="http://absurdfarce.github.com/blog/2011/09/12/ruby-and-concurrency-the-mechanics-of-akka-and-jruby/"/>
+    <updated>2011-09-12T12:00:00-05:00</updated>
+    <id>http://absurdfarce.github.com/blog/2011/09/12/ruby-and-concurrency-the-mechanics-of-akka-and-jruby</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2011/09/ruby-and-concurrency-mechanics-of-akka.html">Heuristic Fencepost</a></p>
+
+<p>I&#8217;m interested in concurrency. I&#8217;m also interested in Ruby. There doesn&#8217;t seem to be much reason to keep these two guys apart anymore.</p>
+
+<p>This post marks the beginning of an occasional series on the topic of using Ruby to write concurrent code. Ruby doesn&#8217;t yet have a big reputation in the world of concurrent and/or parallel applications, but there is some interesting work being done in this space. And since problems in concurrency are notoriously difficult to reason about we could probably do a lot worse than attempt to address those problems in a language designed to make life easier for the developer.</p>
+
+<p>We begin with <a href="http://akka.io">Akka</a>, an excellent library designed to bring actors, actor coordination and STM to Scala and, to a slightly lesser degree, the JVM generally. Our initial task is simple: we wish to be able to define an Akka actor by providing a message handler as a code block. We&#8217;ll start by attempting to implement the actor as a standalone class and then abstract that solution into code which requires the input block and nothing else.</p>
+
+<p>A simple initial implementation looks something like this:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;java&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;akka-actor-1.2-RC6.jar&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;scala-library.jar&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.UntypedActor&#39;</span>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.Actors&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Start with something simple.  Implement the actor as a distinct</span>
+</span><span class='line'><span class="c1"># class and start it up within the Akka runtime.</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Look, I&#39;ve implemented the actor API!</span>
+</span><span class='line'><span class="k">class</span> <span class="nc">SomeActor</span> <span class="o">&lt;</span> <span class="no">UntypedActor</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">onReceive</span> <span class="n">msg</span>
+</span><span class='line'>    <span class="nb">puts</span> <span class="s2">&quot;Received message: </span><span class="si">#{</span><span class="n">msg</span><span class="o">.</span><span class="n">to_s</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># So we should be fine then, right?</span>
+</span><span class='line'><span class="n">ref</span> <span class="o">=</span> <span class="no">Actors</span><span class="o">.</span><span class="n">actorOf</span> <span class="no">SomeActor</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'><span class="n">ref</span><span class="o">.</span><span class="n">start</span>
+</span><span class='line'><span class="n">ref</span><span class="o">.</span><span class="n">tell</span> <span class="s2">&quot;foo&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<pre><code>[@varese ruby]$ ruby --version
+jruby 1.6.2 (ruby-1.8.7-p330) (2011-05-23 e2ea975) (OpenJDK Client VM 1.6.0_22) [linux-i386-java]
+[@varese ruby]$ ruby akka_sample1.rb 
+ArgumentError: Constructor invocation failed: ActorRef for instance of actor [org.jruby.proxy.akka.actor.UntypedActor$Proxy0] is not in scope.
+ You can not create an instance of an actor explicitly using 'new MyActor'.
+ You have to use one of the factory methods in the 'Actor' object to create a new actor.
+ Either use:
+  'val actor = Actor.actorOf[MyActor]', or
+  'val actor = Actor.actorOf(new MyActor(..))'
+  (root) at akka_sample1.rb:20
+</code></pre>
+
+<p>Well, that didn&#8217;t work very well. Apparently the class we defined in JRuby is being exposed to the Java lib as a proxy object and that proxy&#8217;s class is unknown to the Akka runtime. No problem; Akka supports a factory model for actor creation, and by using that approach the underlying class of our actor should become a non-issue. With a few simple changes we&#8217;re ready to try again:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;java&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;akka-actor-1.2-RC6.jar&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;scala-library.jar&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.UntypedActor&#39;</span>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.Actors&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># A second attempt.  Define our actor in a standlone class again</span>
+</span><span class='line'><span class="c1"># but this time use an ActorFactory (via closure coercion) to</span>
+</span><span class='line'><span class="c1"># interact with Akka.</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Define our actor in a class again...</span>
+</span><span class='line'><span class="k">class</span> <span class="nc">SomeActor</span> <span class="o">&lt;</span> <span class="no">UntypedActor</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">onReceive</span> <span class="n">msg</span>
+</span><span class='line'>    <span class="nb">puts</span> <span class="s2">&quot;Received message: </span><span class="si">#{</span><span class="n">msg</span><span class="o">.</span><span class="n">to_s</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># ... and then provide an UntypedActorFactory to instantiate</span>
+</span><span class='line'><span class="c1"># the actor.  The factory interface qualifies as a SAM so</span>
+</span><span class='line'><span class="c1"># we only need to provide a closure to generate the actor and</span>
+</span><span class='line'><span class="c1"># let JRuby&#39;s closure coercion handle the rest.</span>
+</span><span class='line'><span class="n">ref</span> <span class="o">=</span> <span class="no">Actors</span><span class="o">.</span><span class="n">actorOf</span> <span class="k">do</span>
+</span><span class='line'>  <span class="no">SomeActor</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">ref</span><span class="o">.</span><span class="n">start</span>
+</span><span class='line'><span class="n">ref</span><span class="o">.</span><span class="n">tell</span> <span class="s2">&quot;foo&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<pre><code>[@varese ruby]$ ruby akka_sample2.rb
+Received message: foo
+</code></pre>
+
+<p>We now have a working actor, but we still have some work to do; remember, we want to be able to define arbitrary actors by supplying just a code block. We need a few additional pieces to make this work:</p>
+
+<ul>
+<li>A generic actor implementation whose state includes a block or Proc instance. The onReceive method of this actor could then simply call the contained block/Proc, passing the input message as an arg.</li>
+<li>An ActorFactory implementation which takes a code block as an arg, stores it in internal state and then uses that block to build an instance of the generic actor described above on demand.</li>
+</ul>
+
+
+<p>A first cut at this concept might look something like this:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;java&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;akka-actor-1.2-RC6.jar&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;scala-library.jar&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.UntypedActor&#39;</span>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.UntypedActorFactory&#39;</span>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.Actors&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Shift to working with code blocks via a generic actor and a simple</span>
+</span><span class='line'><span class="c1"># factory for creating them.</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">SomeActor</span> <span class="o">&lt;</span> <span class="no">UntypedActor</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># Look, I&#39;ve got a constructor... but it&#39;ll get ignored!</span>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="nb">proc</span><span class="p">)</span>
+</span><span class='line'>    <span class="vi">@proc</span> <span class="o">=</span> <span class="nb">proc</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">onReceive</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</span><span class='line'>    <span class="vi">@proc</span><span class="o">.</span><span class="n">call</span> <span class="n">msg</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">SomeActorFactory</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">UntypedActorFactory</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
+</span><span class='line'>    <span class="vi">@proc</span> <span class="o">=</span> <span class="n">b</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">create</span>
+</span><span class='line'>    <span class="no">SomeActor</span><span class="o">.</span><span class="n">new</span> <span class="vi">@proc</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Create a factory for an actor that uses the input block to pass incoming messages.</span>
+</span><span class='line'><span class="n">factory</span> <span class="o">=</span> <span class="no">SomeActorFactory</span><span class="o">.</span><span class="n">new</span> <span class="k">do</span> <span class="o">|</span><span class="n">msg</span><span class="o">|</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;Message recieved: </span><span class="si">#{</span><span class="n">msg</span><span class="o">.</span><span class="n">to_s</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'><span class="n">ref</span> <span class="o">=</span> <span class="no">Actors</span><span class="o">.</span><span class="n">actorOf</span> <span class="n">factory</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">ref</span><span class="o">.</span><span class="n">start</span>
+</span><span class='line'><span class="n">ref</span><span class="o">.</span><span class="n">tell</span> <span class="s2">&quot;foo&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<pre><code>[@varese ruby]$ ruby akka_sample3.rb 
+ArgumentError: wrong number of arguments for constructor
+  create at akka_sample3.rb:29
+  (root) at akka_sample3.rb:37
+</code></pre>
+
+<p>What went wrong here? UntypedActor is a concrete class with a defined no-arg constructor. That constructor is being called in favor of the one we&#8217;ve provided, and as a consequence our block never gets into the mix. There&#8217;s almost certainly a cleaner way to solve this using JRuby, but for the moment we can get around the problem (in an admittedly ugly way) by providing a setter on our generic actor class:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;java&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;akka-actor-1.2-RC6.jar&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;scala-library.jar&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.UntypedActor&#39;</span>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.UntypedActorFactory&#39;</span>
+</span><span class='line'><span class="n">java_import</span> <span class="s1">&#39;akka.actor.Actors&#39;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Continue with the generic actor implementation, but shift to using a setter</span>
+</span><span class='line'><span class="c1"># for passing in the Proc to which we&#39;ll delegate message handling.</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">SomeActor</span> <span class="o">&lt;</span> <span class="no">UntypedActor</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">proc</span><span class="o">=</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+</span><span class='line'>    <span class="vi">@proc</span> <span class="o">=</span> <span class="n">b</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">onReceive</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</span><span class='line'>    <span class="vi">@proc</span><span class="o">.</span><span class="n">call</span> <span class="n">msg</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">class</span> <span class="nc">SomeActorFactory</span>
+</span><span class='line'>  <span class="kp">include</span> <span class="no">UntypedActorFactory</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">b</span><span class="p">)</span>
+</span><span class='line'>    <span class="vi">@proc</span> <span class="o">=</span> <span class="n">b</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">def</span> <span class="nf">create</span>
+</span><span class='line'>    <span class="n">rv</span> <span class="o">=</span> <span class="no">SomeActor</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'>    <span class="n">rv</span><span class="o">.</span><span class="n">proc</span> <span class="o">=</span> <span class="vi">@proc</span>
+</span><span class='line'>    <span class="n">rv</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Create a factory for an actor that uses the input block to pass incoming messages.</span>
+</span><span class='line'><span class="n">factory</span> <span class="o">=</span> <span class="no">SomeActorFactory</span><span class="o">.</span><span class="n">new</span> <span class="k">do</span> <span class="o">|</span><span class="n">msg</span><span class="o">|</span>
+</span><span class='line'>  <span class="nb">puts</span> <span class="s2">&quot;Message recieved: </span><span class="si">#{</span><span class="n">msg</span><span class="o">.</span><span class="n">to_s</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'><span class="n">ref</span> <span class="o">=</span> <span class="no">Actors</span><span class="o">.</span><span class="n">actorOf</span> <span class="n">factory</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">ref</span><span class="o">.</span><span class="n">start</span>
+</span><span class='line'><span class="n">ref</span><span class="o">.</span><span class="n">tell</span> <span class="s2">&quot;foo&quot;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<pre><code>[@varese ruby]$ ruby akka_sample4.rb 
+Message recieved: foo
+</code></pre>
+
+<p>We now have what we wanted.</p>
+
+<p>If you&#8217;re interested in this topic note that Nick Sieger has covered similar ground (including the interaction between JRuby and Akka) <a href="http://blog.engineyard.com/2011/concurrency-in-jruby">here</a>. Nick&#8217;s article draws on some <a href="http://metaphysicaldeveloper.wordpress.com/2010/12/16/high-level-concurrency-with-jruby-and-akka-actors/">very good work</a> done by Daniel Ribeiro late last year. The code referenced in Daniel&#8217;s article is <a href="https://github.com/danielribeiro/RubyOnAkka">available</a> on Github. I didn&#8217;t come across Daniel&#8217;s post until my own was nearly done but there is quite a bit of overlap between his code and mine. That said, I recommend taking a look at both articles, if for no other reason than the fact that both authors are much better at writing Ruby code than I am.</p>
 ]]></content>
   </entry>
   

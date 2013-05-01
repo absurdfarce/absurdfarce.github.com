@@ -52,6 +52,12 @@
     </url>
     <url>
         <loc>
+            http://absurdfarce.github.com/blog/2011/09/12/ruby-and-concurrency-the-mechanics-of-akka-and-jruby/
+        </loc>
+        <lastmod>2013-04-30T20:35:31-05:00</lastmod>
+    </url>
+    <url>
+        <loc>
             http://absurdfarce.github.com/blog/2011/11/25/musings-on-list-comprehensions-functional-programming-and-python/
         </loc>
         <lastmod>2013-04-11T00:56:33-05:00</lastmod>
@@ -62,7 +68,7 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/blog/archives/</loc>
-        <lastmod>2013-04-18T00:38:06-05:00</lastmod>
+        <lastmod>2013-04-30T20:35:31-05:00</lastmod>
     </url>
     <url>
         <loc>http://absurdfarce.github.com/robots.txt</loc>
@@ -70,6 +76,6 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/</loc>
-        <lastmod>2013-04-18T00:38:06-05:00</lastmod>
+        <lastmod>2013-04-30T20:35:31-05:00</lastmod>
     </url>
 </urlset>
