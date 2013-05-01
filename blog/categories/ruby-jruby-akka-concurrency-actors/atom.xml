@@ -4,7 +4,7 @@
   <title><![CDATA[Category: ruby jruby akka concurrency actors | Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/blog/categories/ruby-jruby-akka-concurrency-actors/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-04-30T20:36:57-05:00</updated>
+  <updated>2013-04-30T20:53:11-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -12,6 +12,337 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Ruby and Concurrency: Design with Actors and Akka]]></title>
+    <link href="http://absurdfarce.github.com/blog/2012/01/05/ruby-and-concurrency-design-with-actors-and-akka/"/>
+    <updated>2012-01-05T12:00:00-06:00</updated>
+    <id>http://absurdfarce.github.com/blog/2012/01/05/ruby-and-concurrency-design-with-actors-and-akka</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2012/01/ruby-and-concurrency-design-with-actors.html">Heuristic Fencepost</a></p>
+
+<p>In a <a href="http://absurdfarce.github.io/blog/2011/09/12/ruby-and-concurrency-the-mechanics-of-akka-and-jruby/">semi-recent post</a> we looked at how we might define actors in JRuby using a combination of Akka and code blocks. That post was very focused on the process of creating actors; we didn't necessarily consider how to build systems with actors and/or whether Ruby might be helpful in doing so. There are plenty of issues to ponder here, but before we dig in let's take a step back and talk briefly about some of the characteristics of actors.</p>
+
+<p>Actors implement a shared-nothing model for concurrency. Mutable system state should be contained by one or more actors in the system. This state is not exposed to external entities directly; it can only be accessed or modified via messages sent to the actor. Since the actor is the only player in this drama that can access the state it contains there is no need to lock or synchronize state access. It should be fairly clear that an actor consists of some amount of mutable system state and some logic for handling incoming messages... and not much more.</p>
+
+<p>Okay, sounds great... but how does it work in practice? We'll consider this question by way of an alogrithm that by now should be pretty familiar: prime number generation using the <a href="http://en.wikipedia.org/wiki/Sieve_of_eratosthenes">Sieve of Eratosthenes</a>. We considered this chestnut (or perhaps you prefer "war horse" at this point) in a <a href="http://heuristic-fencepost.blogspot.com/2010/10/concurrent-prime-factorization-in-go.html">previous post</a> discussing an implementation of this algorithm in the <a href="http://golang.org">Go language</a>. Let's review that implementation and see what else we can do with it.</p>
+
+<p>The support of lightweight goroutines in Go encouraged a pipeline implementation with one goroutine per discovered prime. We can think of the "state" of this system as the total set of discovered primes. Each goroutine knows only about the prime it contains and the channel where candidates should be sent if they "pass" (i.e. do not divide evenly into it's prime number). Once the goroutine is created it's state doesn't change. New state is added by creating a new goroutine for a newly-discovered prime. State is never deleted; once a prime is discovered removing it from consideration is non-sensical. As a consequence state is completely distributed; no entity in the system knows about all discovered primes.</p>
+
+<p>We also note that the algorithm described here isn't very friendly to parallel decomposition [1]. Candidate values are compared to previously discovered primes one at a time: if the candidate passes the test it's allowed to move on, otherwise no further evaluation occurs. This technique is referred to as "fail-fast" behaviour; if a value fails a test it doesn't lead to any wasteful extra work. The concurrent approach is quite different: compare the candidate to all discovered primes at once and return success only if all tests pass. Comparisons are done independently, so even if the "first" [2] comparison fails all other comparisons still execute. We lose our fail-fast behaviour but gain the ability to decompose the entire process into smaller jobs that can execute in parallel. A trade-off in engineering... surprising, I know.</p>
+
+<p>We'll set out to implement the Sieve of Eratosthenes in Ruby using JRuby and Akka. Our new implementation will have more of a bias towards parallelism; this time we're okay with throwing away some work. Clearly we'll need an actor to compare a candidate to one or more discovered primes; that is, after all, why we're here. We can think of these actors as maintaining the state of our system (just like the goroutines in the Go implementation) so we'll borrow a term from MVC and call these "model" actors. Concurrently evaluating candidates against these models implies an organizing actor that is aware of all models; it seems natural to call this the "controller" actor. To keep things simple we don't want to support an unlimited number of models so we create a fixed-size "pool" and distribute system state (i.e. the set of discovered primes) between these models. When a new prime is discovered the controller will be responsible for adding that prime to an existing model.</p>
+
+<p>The implementation in Ruby looks like this:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+<span class='line-number'>68</span>
+<span class='line-number'>69</span>
+<span class='line-number'>70</span>
+<span class='line-number'>71</span>
+<span class='line-number'>72</span>
+<span class='line-number'>73</span>
+<span class='line-number'>74</span>
+<span class='line-number'>75</span>
+<span class='line-number'>76</span>
+<span class='line-number'>77</span>
+<span class='line-number'>78</span>
+<span class='line-number'>79</span>
+<span class='line-number'>80</span>
+<span class='line-number'>81</span>
+<span class='line-number'>82</span>
+<span class='line-number'>83</span>
+<span class='line-number'>84</span>
+<span class='line-number'>85</span>
+<span class='line-number'>86</span>
+<span class='line-number'>87</span>
+<span class='line-number'>88</span>
+<span class='line-number'>89</span>
+<span class='line-number'>90</span>
+<span class='line-number'>91</span>
+<span class='line-number'>92</span>
+<span class='line-number'>93</span>
+<span class='line-number'>94</span>
+<span class='line-number'>95</span>
+<span class='line-number'>96</span>
+<span class='line-number'>97</span>
+<span class='line-number'>98</span>
+<span class='line-number'>99</span>
+<span class='line-number'>100</span>
+<span class='line-number'>101</span>
+<span class='line-number'>102</span>
+<span class='line-number'>103</span>
+<span class='line-number'>104</span>
+<span class='line-number'>105</span>
+<span class='line-number'>106</span>
+<span class='line-number'>107</span>
+<span class='line-number'>108</span>
+<span class='line-number'>109</span>
+<span class='line-number'>110</span>
+<span class='line-number'>111</span>
+<span class='line-number'>112</span>
+<span class='line-number'>113</span>
+<span class='line-number'>114</span>
+<span class='line-number'>115</span>
+<span class='line-number'>116</span>
+<span class='line-number'>117</span>
+<span class='line-number'>118</span>
+<span class='line-number'>119</span>
+<span class='line-number'>120</span>
+<span class='line-number'>121</span>
+<span class='line-number'>122</span>
+<span class='line-number'>123</span>
+<span class='line-number'>124</span>
+<span class='line-number'>125</span>
+<span class='line-number'>126</span>
+<span class='line-number'>127</span>
+<span class='line-number'>128</span>
+<span class='line-number'>129</span>
+<span class='line-number'>130</span>
+<span class='line-number'>131</span>
+<span class='line-number'>132</span>
+<span class='line-number'>133</span>
+<span class='line-number'>134</span>
+<span class='line-number'>135</span>
+<span class='line-number'>136</span>
+<span class='line-number'>137</span>
+<span class='line-number'>138</span>
+<span class='line-number'>139</span>
+<span class='line-number'>140</span>
+<span class='line-number'>141</span>
+<span class='line-number'>142</span>
+<span class='line-number'>143</span>
+<span class='line-number'>144</span>
+<span class='line-number'>145</span>
+<span class='line-number'>146</span>
+<span class='line-number'>147</span>
+<span class='line-number'>148</span>
+</pre></td><td class='code'><pre><code class='ruby'><span class='line'><span class="nb">require</span> <span class="s1">&#39;java&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;lib/akka-actor-1.2.jar&#39;</span>
+</span><span class='line'><span class="nb">require</span> <span class="s1">&#39;lib/scala-library.jar&#39;</span><span class="o">&lt;</span><span class="sr">/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="sr">&lt;p&gt;java_import &#39;akka.actor.Actors&#39;</span>
+</span><span class='line'><span class="sr">java_import &#39;akka.actor.UntypedActor&#39;</span>
+</span><span class='line'><span class="sr">java_import &#39;akka.actor.UntypedActorFactory&#39;&lt;/</span><span class="nb">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="nb">p</span><span class="o">&gt;</span><span class="k">module</span> <span class="nn">Sieve</span><span class="o">&lt;</span><span class="sr">/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="sr">&lt;p&gt;  # Basic Enumerable wrapper for a Controller actor... just a convenience thing really</span>
+</span><span class='line'><span class="sr">  class Primes&lt;/</span><span class="nb">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="kp">include</span> <span class="no">Enumerable</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">controller</span><span class="p">)</span>
+</span><span class='line'>  <span class="vi">@controller</span> <span class="o">=</span> <span class="n">controller</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">each</span>
+</span><span class='line'>  <span class="kp">loop</span> <span class="k">do</span>
+</span><span class='line'>    <span class="k">yield</span> <span class="vi">@controller</span><span class="o">.</span><span class="n">sendRequestReply</span><span class="p">(</span><span class="ss">:next</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'><span class="o">&lt;</span><span class="sr">/code&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="nb">p</span><span class="o">&gt;</span>  <span class="k">end</span><span class="o">&lt;</span><span class="sr">/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="sr">&lt;p&gt;  # Enumerable implementation representing the set of prime number candidates &gt; 10.  Use of an</span>
+</span><span class='line'><span class="sr">  # enumerable here allows us to isolate the state associated with candidate selection to this</span>
+</span><span class='line'><span class="sr">  # class, freeing up the model and controller actors to focus on other parts of the computation</span>
+</span><span class='line'><span class="sr">  class Candidates&lt;/</span><span class="nb">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="kp">include</span> <span class="no">Enumerable</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">initialize</span>
+</span><span class='line'>  <span class="c1"># Note that this initial value is never actually returned; we&#39;re only setting the stage for the</span>
+</span><span class='line'>  <span class="c1"># first increment to generate the first candidate</span>
+</span><span class='line'>  <span class="vi">@next</span> <span class="o">=</span> <span class="mi">9</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Primes must be a number ending in 1, 3, 7 or 9... a bit of reflection will make it clear why</span>
+</span><span class='line'><span class="k">def</span> <span class="nf">each</span>
+</span><span class='line'>  <span class="kp">loop</span> <span class="k">do</span>
+</span><span class='line'>    <span class="vi">@next</span> <span class="o">+=</span> <span class="p">(</span><span class="vi">@next</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">3</span><span class="p">)</span> <span class="p">?</span> <span class="mi">4</span> <span class="p">:</span> <span class="mi">2</span>
+</span><span class='line'>    <span class="k">yield</span> <span class="vi">@next</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'><span class="o">&lt;</span><span class="sr">/code&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="nb">p</span><span class="o">&gt;</span>  <span class="k">end</span><span class="o">&lt;</span><span class="sr">/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="sr">&lt;p&gt;  class Controller &amp;lt; UntypedActor&lt;/</span><span class="nb">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">def</span> <span class="nf">initialize</span>
+</span><span class='line'>  <span class="vi">@models</span> <span class="o">=</span> <span class="mi">0</span><span class="o">.</span><span class="n">upto</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">map</span> <span class="k">do</span> <span class="o">|</span><span class="n">idx</span><span class="o">|</span>
+</span><span class='line'>    <span class="n">model</span> <span class="o">=</span> <span class="no">Actors</span><span class="o">.</span><span class="n">actorOf</span> <span class="p">{</span> <span class="ss">Sieve</span><span class="p">:</span><span class="ss">:Model</span><span class="o">.</span><span class="n">new</span> <span class="p">}</span>
+</span><span class='line'>    <span class="n">model</span><span class="o">.</span><span class="n">start</span>
+</span><span class='line'>    <span class="n">model</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># Seed models with a few initial values... just to get things going</span>
+</span><span class='line'>  <span class="vi">@seeds</span> <span class="o">=</span> <span class="o">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">7</span><span class="o">]</span>
+</span><span class='line'>  <span class="mi">0</span><span class="o">.</span><span class="n">upto</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">idx</span><span class="o">|</span> <span class="vi">@models</span><span class="o">[</span><span class="n">idx</span><span class="o">].</span><span class="n">tell</span> <span class="o">[</span><span class="ss">:add</span><span class="p">,</span><span class="vi">@seeds</span><span class="o">[</span><span class="n">idx</span><span class="o">]]</span> <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="vi">@candidates</span> <span class="o">=</span> <span class="no">Candidates</span><span class="o">.</span><span class="n">new</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1"># Part of the lifecycle for an Akka actor.  When this actor is shut down</span>
+</span><span class='line'><span class="c1"># we&#39;ll want to shut down all the models we&#39;re aware of as well</span>
+</span><span class='line'><span class="k">def</span> <span class="nf">postStop</span>
+</span><span class='line'>  <span class="vi">@models</span><span class="o">.</span><span class="n">each</span> <span class="p">{</span> <span class="o">|</span><span class="n">m</span><span class="o">|</span> <span class="n">m</span><span class="o">.</span><span class="n">stop</span> <span class="p">}</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">onReceive</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">case</span> <span class="n">msg</span>
+</span><span class='line'>  <span class="k">when</span> <span class="ss">:next</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1"># If we still have seeds to return do so up front</span>
+</span><span class='line'>    <span class="n">seed</span> <span class="o">=</span> <span class="vi">@seeds</span><span class="o">.</span><span class="n">shift</span>
+</span><span class='line'>    <span class="k">if</span> <span class="n">seed</span>
+</span><span class='line'>      <span class="nb">self</span><span class="o">.</span><span class="n">getContext</span><span class="o">.</span><span class="n">replySafe</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+</span><span class='line'>      <span class="k">return</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1"># If we&#39;re still here then we need to evaluate candidates against our models.  Each</span>
+</span><span class='line'>    <span class="c1"># candidate value is fed into the models in parallel.  The first value that all models</span>
+</span><span class='line'>    <span class="c1"># agree is prime is returned as the value</span>
+</span><span class='line'>    <span class="n">val</span> <span class="o">=</span> <span class="vi">@candidates</span><span class="o">.</span><span class="n">find</span> <span class="k">do</span> <span class="o">|</span><span class="n">candidate</span><span class="o">|</span>
+</span><span class='line'>      <span class="vi">@models</span><span class="o">.</span><span class="n">map</span> <span class="p">{</span> <span class="o">|</span><span class="n">m</span><span class="o">|</span> <span class="n">m</span><span class="o">.</span><span class="n">sendRequestReplyFuture</span> <span class="o">[</span><span class="ss">:isprime</span><span class="p">,</span><span class="n">candidate</span><span class="o">]</span> <span class="p">}</span><span class="o">.</span><span class="n">all?</span> <span class="k">do</span> <span class="o">|</span><span class="n">f</span><span class="o">|</span>
+</span><span class='line'>        <span class="n">f</span><span class="o">.</span><span class="n">await</span>
+</span><span class='line'>        <span class="k">return</span> <span class="kp">false</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">f</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">isDefined</span>
+</span><span class='line'>        <span class="n">f</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">get</span>
+</span><span class='line'>      <span class="k">end</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1"># Now that we have a prime value we need to update the state of one of our models to</span>
+</span><span class='line'>    <span class="c1"># include this new value.  For now we just choose a model at random</span>
+</span><span class='line'>    <span class="vi">@models</span><span class="o">[</span><span class="p">(</span><span class="nb">rand</span> <span class="vi">@models</span><span class="o">.</span><span class="n">size</span><span class="p">)</span><span class="o">].</span><span class="n">tell</span> <span class="o">[</span><span class="ss">:add</span><span class="p">,</span><span class="n">val</span><span class="o">]</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1"># Finally, send a response back to the caller</span>
+</span><span class='line'>    <span class="nb">self</span><span class="o">.</span><span class="n">getContext</span><span class="o">.</span><span class="n">replySafe</span> <span class="n">val</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'><span class="o">&lt;</span><span class="sr">/code&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="nb">p</span><span class="o">&gt;</span>  <span class="k">end</span><span class="o">&lt;</span><span class="sr">/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="sr">&lt;p&gt;  # A model represents a fragment of the state of our sieve, specifically some subset</span>
+</span><span class='line'><span class="sr">  # of the primes discovered so far.</span>
+</span><span class='line'><span class="sr">  class Model &amp;lt; UntypedActor&lt;/</span><span class="nb">p</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;&lt;</span><span class="n">code</span><span class="o">&gt;</span><span class="k">def</span> <span class="nf">initialize</span>
+</span><span class='line'>  <span class="vi">@primes</span> <span class="o">=</span> <span class="o">[]</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'><span class="k">def</span> <span class="nf">onReceive</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1"># It&#39;s times like this that one really does miss Scala&#39;s pattern matching</span>
+</span><span class='line'>  <span class="c1"># but case fills in nicely enough</span>
+</span><span class='line'>  <span class="p">(</span><span class="n">type</span><span class="p">,</span><span class="n">data</span><span class="p">)</span> <span class="o">=</span> <span class="n">msg</span>
+</span><span class='line'>  <span class="k">case</span> <span class="n">type</span>
+</span><span class='line'>  <span class="k">when</span> <span class="ss">:add</span>
+</span><span class='line'>    <span class="vi">@primes</span> <span class="o">&amp;</span><span class="n">lt</span><span class="p">;</span><span class="o">&amp;</span><span class="n">lt</span><span class="p">;</span> <span class="n">data</span>
+</span><span class='line'>  <span class="k">when</span> <span class="ss">:isprime</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1"># If we haven&#39;t been fed any primes yet we can&#39;t say much...</span>
+</span><span class='line'>    <span class="k">if</span> <span class="vi">@primes</span><span class="o">.</span><span class="n">empty?</span>
+</span><span class='line'>      <span class="nb">self</span><span class="o">.</span><span class="n">getContext</span><span class="o">.</span><span class="n">replySafe</span> <span class="kp">nil</span>
+</span><span class='line'>      <span class="k">return</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>
+</span><span class='line'>    <span class="c1"># This model only considers a value prime if it doesn&#39;t divide evenly into any</span>
+</span><span class='line'>    <span class="c1"># prime it already knows about.  Of course we have to make an exception if we&#39;re</span>
+</span><span class='line'>    <span class="c1"># testing one of the primes we already know about</span>
+</span><span class='line'>    <span class="n">resp</span> <span class="o">=</span> <span class="vi">@primes</span><span class="o">.</span><span class="n">none?</span> <span class="k">do</span> <span class="o">|</span><span class="n">prime</span><span class="o">|</span>
+</span><span class='line'>      <span class="n">data</span> <span class="o">!=</span> <span class="n">prime</span> <span class="ow">and</span> <span class="n">data</span> <span class="o">%</span> <span class="n">prime</span> <span class="o">==</span> <span class="mi">0</span>
+</span><span class='line'>    <span class="k">end</span>
+</span><span class='line'>    <span class="nb">self</span><span class="o">.</span><span class="n">getContext</span><span class="o">.</span><span class="n">replySafe</span> <span class="n">resp</span>
+</span><span class='line'>  <span class="k">else</span>
+</span><span class='line'>    <span class="nb">puts</span> <span class="s2">&quot;Unknown type </span><span class="si">#{</span><span class="n">type</span><span class="si">}</span><span class="s2">&quot;</span>
+</span><span class='line'>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span><span class='line'><span class="o">&lt;</span><span class="sr">/code&gt;&lt;/</span><span class="n">pre</span><span class="o">&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">&lt;</span><span class="nb">p</span><span class="o">&gt;</span>  <span class="k">end</span>
+</span><span class='line'><span class="k">end</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>Ruby offers a number of features which help us out here. As shown in this implementation messages can be as simple as a list with a leading symbol (used to indicate the message "type") and a payload contained in the remainder of the list. This follows a similar convention found in Erlang, although that language uses tuples rather than lists. Support for destructuring/multiple assignment makes working with these messages quite simple.</p>
+
+<p>Our previous work building actors from code blocks doesn't apply here due to an implementation detail so we define both the controller and model actors as distinct classes. As it turns out this change isn't much of a problem; we're able to implement both classes, a helper Enumerable and a second Enumerable wrapping the controller in less than 140 lines with comments. Full code (including tests) can be found on <a href="https://github.com/heuristicfencepost/sieve_actors">github</a>.</p>
+
+<p>Spend a little time with JRuby and Akka and it becomes clear that they work well together and form a good basis for building concurrent applications in Ruby.</p>
+
+<p>[1] This is a bit of a loaded statement; you will get some parallelism as multiple candidates move through the "stages" (i.e. goroutines) of the pipeline. That said, this notion of parallelism applies to the system as a whole. The process of determining whether a single candidate is or is not a prime number is still very sequential.</p>
+
+<p>[2] "First" here means nothing more than "whichever test happens to complete and return a value first"</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Ruby and Concurrency: The Mechanics of Akka and JRuby]]></title>
