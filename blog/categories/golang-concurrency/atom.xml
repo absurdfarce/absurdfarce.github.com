@@ -4,7 +4,7 @@
   <title><![CDATA[Category: golang concurrency | Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/blog/categories/golang-concurrency/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-05-09T23:15:51-05:00</updated>
+  <updated>2013-05-09T23:23:07-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -118,9 +118,9 @@
 </span><span class='line'>
 </span><span class='line'>     <span class="k">if</span> <span class="nx">i</span> <span class="o">%</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
 </span><span class='line'>      <span class="nx">out</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;out&#39;.</span>
-</span><span class='line'>          <span class="p">}</span>
-</span><span class='line'>      <span class="p">}</span>
-</span><span class='line'>      <span class="nx">out</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="o">-</span><span class="mi">1</span>
+</span><span class='line'> <span class="p">}</span>
+</span><span class='line'> <span class="p">}</span>
+</span><span class='line'> <span class="nx">out</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="o">-</span><span class="mi">1</span>
 </span><span class='line'><span class="p">&lt;</span><span class="o">/</span><span class="nx">code</span><span class="p">&gt;&lt;</span><span class="o">/</span><span class="nx">pre</span><span class="p">&gt;</span>
 </span><span class='line'>
 </span><span class='line'><span class="p">&lt;</span><span class="nx">p</span><span class="p">&gt;}&lt;</span><span class="o">/</span><span class="nx">p</span><span class="p">&gt;</span>
@@ -132,10 +132,10 @@
 </span><span class='line'> <span class="k">go</span> <span class="nx">Generate</span><span class="p">(</span><span class="nx">max</span><span class="p">,</span><span class="nx">ch</span><span class="p">)</span>      <span class="c1">// Start Generate() as a subprocess.</span>
 </span><span class='line'> <span class="k">for</span> <span class="nx">prime</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span><span class="nx">ch</span><span class="p">;</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span> <span class="nx">prime</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span><span class="nx">ch</span> <span class="p">{</span>
 </span><span class='line'>     <span class="nb">print</span><span class="p">(</span><span class="nx">prime</span><span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">)</span>
-</span><span class='line'>          <span class="nx">ch1</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
-</span><span class='line'>              <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
-</span><span class='line'>             <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
-</span><span class='line'>             <span class="p">}</span>
+</span><span class='line'> <span class="nx">ch1</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
+</span><span class='line'> <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
+</span><span class='line'> <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
+</span><span class='line'> <span class="p">}</span>
 </span><span class='line'><span class="p">&lt;</span><span class="o">/</span><span class="nx">code</span><span class="p">&gt;&lt;</span><span class="o">/</span><span class="nx">pre</span><span class="p">&gt;</span>
 </span><span class='line'>
 </span><span class='line'><span class="p">&lt;</span><span class="nx">p</span><span class="p">&gt;}&lt;</span><span class="o">/</span><span class="nx">p</span><span class="p">&gt;</span>
@@ -278,10 +278,10 @@ Linking sieve...
 </span><span class='line'><span class="p">&lt;</span><span class="nx">pre</span><span class="p">&gt;&lt;</span><span class="nx">code</span><span class="p">&gt;</span> <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="nx">in</span><span class="p">;</span> <span class="nx">i</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span> <span class="nx">i</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="nx">in</span> <span class="p">{</span>
 </span><span class='line'>
 </span><span class='line'>     <span class="k">if</span> <span class="nx">i</span> <span class="o">%</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
-</span><span class='line'>      <span class="nx">out</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="nx">i</span>
-</span><span class='line'>          <span class="p">}</span>
-</span><span class='line'>      <span class="p">}</span>
-</span><span class='line'>      <span class="nx">out</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="o">-</span><span class="mi">1</span>
+</span><span class='line'>      <span class="nx">out</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;out&#39;.</span>
+</span><span class='line'> <span class="p">}</span>
+</span><span class='line'> <span class="p">}</span>
+</span><span class='line'> <span class="nx">out</span> <span class="o">&amp;</span><span class="nx">lt</span><span class="p">;</span><span class="o">-</span> <span class="o">-</span><span class="mi">1</span>
 </span><span class='line'><span class="p">&lt;</span><span class="o">/</span><span class="nx">code</span><span class="p">&gt;&lt;</span><span class="o">/</span><span class="nx">pre</span><span class="p">&gt;</span>
 </span><span class='line'>
 </span><span class='line'><span class="p">&lt;</span><span class="nx">p</span><span class="p">&gt;}&lt;</span><span class="o">/</span><span class="nx">p</span><span class="p">&gt;</span>
@@ -310,8 +310,8 @@ Linking sieve...
 </span><span class='line'><span class="c1">// not.  This performs the daisy chaining setup that was being</span>
 </span><span class='line'><span class="c1">// done by the Sieve() function in sieve.go.</span>
 </span><span class='line'>    <span class="nx">ch1</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
-</span><span class='line'><span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
-</span><span class='line'><span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
+</span><span class='line'>    <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
+</span><span class='line'>    <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
 </span><span class='line'> <span class="p">}</span>
 </span><span class='line'>
 </span><span class='line'> <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Results: %s\n&quot;</span><span class="p">,</span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Sprint</span><span class="p">(</span><span class="nx">rv</span><span class="p">))</span>

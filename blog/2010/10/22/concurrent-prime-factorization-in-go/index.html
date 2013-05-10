@@ -167,8 +167,8 @@
 </span><span class='line'>     <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="mi">2</span>
 </span><span class='line'>     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">3</span><span class="p">;</span> <span class="nx">i</span><span class="o">&lt;=</span><span class="nx">max</span> <span class="p">;</span> <span class="nx">i</span> <span class="o">+=</span> <span class="mi">2</span> <span class="p">{</span>
 </span><span class='line'>       <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;ch&#39;.</span>
-</span><span class='line'>   <span class="p">}</span>
-</span><span class='line'>   <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span> <span class="c1">// Use -1 as an indicator that we&#39;re done now</span>
+</span><span class='line'>     <span class="p">}</span>
+</span><span class='line'>     <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span> <span class="c1">// Use -1 as an indicator that we&#39;re done now</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
 </span><span class='line'><span class="c1">// Copy the values from channel &#39;in&#39; to channel &#39;out&#39;,</span>
@@ -178,9 +178,9 @@
 </span><span class='line'>
 </span><span class='line'>       <span class="k">if</span> <span class="nx">i</span> <span class="o">%</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
 </span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;out&#39;.</span>
-</span><span class='line'>            <span class="p">}</span>
-</span><span class='line'>        <span class="p">}</span>
-</span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span>
+</span><span class='line'>   <span class="p">}</span>
+</span><span class='line'>     <span class="p">}</span>
+</span><span class='line'>     <span class="nx">out</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
 </span><span class='line'><span class="c1">// The prime sieve: Daisy-chain Filter processes together.</span>
@@ -189,10 +189,10 @@
 </span><span class='line'>     <span class="k">go</span> <span class="nx">Generate</span><span class="p">(</span><span class="nx">max</span><span class="p">,</span><span class="nx">ch</span><span class="p">)</span>      <span class="c1">// Start Generate() as a subprocess.</span>
 </span><span class='line'>     <span class="k">for</span> <span class="nx">prime</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">ch</span><span class="p">;</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span> <span class="nx">prime</span> <span class="p">=</span> <span class="o">&lt;-</span><span class="nx">ch</span> <span class="p">{</span>
 </span><span class='line'>       <span class="nb">print</span><span class="p">(</span><span class="nx">prime</span><span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">)</span>
-</span><span class='line'>            <span class="nx">ch1</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
-</span><span class='line'>                <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
-</span><span class='line'>               <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
-</span><span class='line'>               <span class="p">}</span>
+</span><span class='line'>   <span class="nx">ch1</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
+</span><span class='line'>   <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
+</span><span class='line'>   <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
+</span><span class='line'>     <span class="p">}</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
 </span><span class='line'><span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
@@ -312,8 +312,8 @@ Linking sieve...
 </span><span class='line'>     <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="mi">2</span>
 </span><span class='line'>     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">3</span><span class="p">;</span> <span class="nx">i</span><span class="o">&lt;=</span><span class="nx">max</span> <span class="p">;</span> <span class="nx">i</span> <span class="o">+=</span> <span class="mi">2</span> <span class="p">{</span>
 </span><span class='line'>       <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;ch&#39;.</span>
-</span><span class='line'>   <span class="p">}</span>
-</span><span class='line'>   <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span> <span class="c1">// Use -1 as an indicator that we&#39;re done now</span>
+</span><span class='line'>     <span class="p">}</span>
+</span><span class='line'>     <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span> <span class="c1">// Use -1 as an indicator that we&#39;re done now</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
 </span><span class='line'><span class="c1">// Copy the values from channel &#39;in&#39; to channel &#39;out&#39;,</span>
@@ -322,10 +322,10 @@ Linking sieve...
 </span><span class='line'>     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="o">&lt;-</span> <span class="nx">in</span><span class="p">;</span> <span class="nx">i</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span> <span class="nx">i</span> <span class="p">=</span> <span class="o">&lt;-</span> <span class="nx">in</span> <span class="p">{</span>
 </span><span class='line'>
 </span><span class='line'>       <span class="k">if</span> <span class="nx">i</span> <span class="o">%</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
-</span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="nx">i</span>
-</span><span class='line'>            <span class="p">}</span>
-</span><span class='line'>        <span class="p">}</span>
-</span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span>
+</span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;out&#39;.</span>
+</span><span class='line'>   <span class="p">}</span>
+</span><span class='line'>     <span class="p">}</span>
+</span><span class='line'>     <span class="nx">out</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span>
 </span><span class='line'><span class="p">}</span>
 </span><span class='line'>
 </span><span class='line'><span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
@@ -352,8 +352,8 @@ Linking sieve...
 </span><span class='line'>  <span class="c1">// not.  This performs the daisy chaining setup that was being</span>
 </span><span class='line'>  <span class="c1">// done by the Sieve() function in sieve.go.</span>
 </span><span class='line'>        <span class="nx">ch1</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
-</span><span class='line'>  <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
-</span><span class='line'>  <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
+</span><span class='line'>        <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
+</span><span class='line'>        <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
 </span><span class='line'>     <span class="p">}</span>
 </span><span class='line'>
 </span><span class='line'>     <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Results: %s\n&quot;</span><span class="p">,</span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Sprint</span><span class="p">(</span><span class="nx">rv</span><span class="p">))</span>
