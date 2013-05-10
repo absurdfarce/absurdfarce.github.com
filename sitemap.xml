@@ -22,13 +22,17 @@
         <loc>
             http://absurdfarce.github.com/blog/2010/10/31/base64-in-clojure-an-initial-attempt/
         </loc>
-        <lastmod>2013-05-09T22:39:28-05:00</lastmod>
+        <lastmod>2013-05-09T22:52:29-05:00</lastmod>
     </url>
     <url>
         <loc>
             http://absurdfarce.github.com/blog/2010/12/20/a-funny-thing-happened-while-writing-some-haskell/
         </loc>
         <lastmod>2013-04-11T01:08:34-05:00</lastmod>
+    </url>
+    <url>
+        <loc>http://absurdfarce.github.com/blog/2010/12/28/base64-in-clojure-once-more/</loc>
+        <lastmod>2013-05-09T22:56:18-05:00</lastmod>
     </url>
     <url>
         <loc>
@@ -80,7 +84,7 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/blog/archives/</loc>
-        <lastmod>2013-05-09T22:39:28-05:00</lastmod>
+        <lastmod>2013-05-09T22:56:18-05:00</lastmod>
     </url>
     <url>
         <loc>http://absurdfarce.github.com/robots.txt</loc>
@@ -88,6 +92,6 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/</loc>
-        <lastmod>2013-05-09T22:39:28-05:00</lastmod>
+        <lastmod>2013-05-09T22:56:18-05:00</lastmod>
     </url>
 </urlset>
