@@ -467,6 +467,322 @@ RFJlYWkqIF10RCc1PXlpO3FcIDY6dkJuQkhHNWxRJkwkOFdgciFGfHwhYz5EYG15PjxWdFJ9Ml83TGFo
       
   <header>
     
+      <h1 class="entry-title"><a href="/blog/2010/10/22/concurrent-prime-factorization-in-go/">Concurrent Prime Factorization in Go</a></h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2010-10-22T12:00:00-05:00" pubdate data-updated="true">Oct 22<span>nd</span>, 2010</time>
+        
+      </p>
+    
+  </header>
+
+
+  <div class="entry-content"><p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/10/concurrent-prime-factorization-in-go.html">Heuristic Fencepost</a></p>
+
+<p>For a little while now I&#8217;ve been looking for a problem that would allow me to sink my teeth into <a href="http://golang.org">Google&#8217;s Go language</a> and see if it&#8217;s as tasty as it appears to be. After coming across Alex Tkachman&#8217;s <a href="https://profiles.google.com/113183999235628738153/buzz/J8oSTjegB5F">request for concurrency benchmarks</a> it was clear that I had what I needed. Alex is the driving force behind Groovy++ and his proposal was to implement a common benchmark (a concurrent version of prime factorization using the Sieve of Eratosthenes) in multiple JVM languages in order to compare and contrast what works and what doesn&#8217;t. An implementation in Go wouldn&#8217;t help much in benchmarking JVM languages but the highly concurrent nature of the problem does map naturally onto Go&#8217;s feature set. The language distribution also includes an elegant implementation of the Sieve of Eratosthenes in it&#8217;s tests so we already have a solid foundation to build from.</p>
+
+<p>Let&#8217;s begin with sieve.go. The implementation consists of chained goroutines. Each time a candidate makes it through the sieve and is returned as a new prime number a new goroutine is created to check future candidates and reject them if they divide evenly by the new prime. The implementation cleanly demonstrates the concept but isn&#8217;t useful as a standalone application since it includes no termination condition. Let&#8217;s begin by adding that in:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+</pre></td><td class='code'><pre><code class='go'><span class='line'><span class="c1">// $G $F.go &amp;&amp; $L $F.$A  # don&#39;t run it - goes forever</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Copyright 2009 The Go Authors. All rights reserved.</span>
+</span><span class='line'><span class="c1">// Use of this source code is governed by a BSD-style</span>
+</span><span class='line'><span class="c1">// license that can be found in the LICENSE file.</span>
+</span><span class='line'>
+</span><span class='line'><span class="kn">package</span> <span class="nx">main</span>
+</span><span class='line'>
+</span><span class='line'><span class="kn">import</span> <span class="s">&quot;flag&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Send the sequence 2, 3, 4, ... to channel &#39;ch&#39;.</span>
+</span><span class='line'><span class="kd">func</span> <span class="nx">Generate</span><span class="p">(</span><span class="nx">max</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">ch</span> <span class="kd">chan</span><span class="o">&lt;-</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>     <span class="c1">// Slight optimization; after 2 we know there are no even primes so we only</span>
+</span><span class='line'>     <span class="c1">// need to consider odd values</span>
+</span><span class='line'>     <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="mi">2</span>
+</span><span class='line'>     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">3</span><span class="p">;</span> <span class="nx">i</span><span class="o">&lt;=</span><span class="nx">max</span> <span class="p">;</span> <span class="nx">i</span> <span class="o">+=</span> <span class="mi">2</span> <span class="p">{</span>
+</span><span class='line'>       <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;ch&#39;.</span>
+</span><span class='line'>   <span class="p">}</span>
+</span><span class='line'>   <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span> <span class="c1">// Use -1 as an indicator that we&#39;re done now</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Copy the values from channel &#39;in&#39; to channel &#39;out&#39;,</span>
+</span><span class='line'><span class="c1">// removing those divisible by &#39;prime&#39;.</span>
+</span><span class='line'><span class="kd">func</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">in</span> <span class="o">&lt;-</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">out</span> <span class="kd">chan</span><span class="o">&lt;-</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">prime</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="o">&lt;-</span> <span class="nx">in</span><span class="p">;</span> <span class="nx">i</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span> <span class="nx">i</span> <span class="p">=</span> <span class="o">&lt;-</span> <span class="nx">in</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>       <span class="k">if</span> <span class="nx">i</span> <span class="o">%</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
+</span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;out&#39;.</span>
+</span><span class='line'>            <span class="p">}</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// The prime sieve: Daisy-chain Filter processes together.</span>
+</span><span class='line'><span class="kd">func</span> <span class="nx">Sieve</span><span class="p">(</span><span class="nx">max</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>     <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span> <span class="c1">// Create a new channel.</span>
+</span><span class='line'>     <span class="k">go</span> <span class="nx">Generate</span><span class="p">(</span><span class="nx">max</span><span class="p">,</span><span class="nx">ch</span><span class="p">)</span>      <span class="c1">// Start Generate() as a subprocess.</span>
+</span><span class='line'>     <span class="k">for</span> <span class="nx">prime</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">ch</span><span class="p">;</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span> <span class="nx">prime</span> <span class="p">=</span> <span class="o">&lt;-</span><span class="nx">ch</span> <span class="p">{</span>
+</span><span class='line'>       <span class="nb">print</span><span class="p">(</span><span class="nx">prime</span><span class="p">,</span> <span class="s">&quot;\n&quot;</span><span class="p">)</span>
+</span><span class='line'>            <span class="nx">ch1</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
+</span><span class='line'>                <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
+</span><span class='line'>               <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
+</span><span class='line'>               <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>     <span class="kd">var</span> <span class="nx">max</span> <span class="o">*</span><span class="kt">int</span> <span class="p">=</span> <span class="nx">flag</span><span class="p">.</span><span class="nx">Int</span><span class="p">(</span><span class="s">&quot;max&quot;</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="s">&quot;Maximum number we wish to return&quot;</span><span class="p">)</span>
+</span><span class='line'>     <span class="nx">flag</span><span class="p">.</span><span class="nx">Parse</span><span class="p">()</span>
+</span><span class='line'>     <span class="nx">Sieve</span><span class="p">(</span><span class="o">*</span><span class="nx">max</span><span class="p">)</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<pre><code>[varese factorization_benchmark]$ cd go
+[varese go]$ ls
+factor.go  sieve.go
+[varese go]$ gobuild sieve.go
+Parsing go file(s)...
+Compiling main (sieve)...
+Linking sieve...
+[varese go]$ ./sieve -max 20
+2
+3
+5
+7
+11
+13
+17
+19
+</code></pre>
+
+<p>That seemed to work nicely. Adding in the factorization code leads us to factor.go:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+<span class='line-number'>57</span>
+<span class='line-number'>58</span>
+<span class='line-number'>59</span>
+<span class='line-number'>60</span>
+<span class='line-number'>61</span>
+<span class='line-number'>62</span>
+<span class='line-number'>63</span>
+<span class='line-number'>64</span>
+<span class='line-number'>65</span>
+<span class='line-number'>66</span>
+<span class='line-number'>67</span>
+</pre></td><td class='code'><pre><code class='go'><span class='line'><span class="c1">// Copyright 2009 The Go Authors. All rights reserved.</span>
+</span><span class='line'><span class="c1">// Use of this source code is governed by a BSD-style</span>
+</span><span class='line'><span class="c1">// license that can be found in the LICENSE file.</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Prime factorization derived from slightly modified version of</span>
+</span><span class='line'><span class="c1">// sieve.go in Go source distribution.</span>
+</span><span class='line'>
+</span><span class='line'><span class="kn">package</span> <span class="nx">main</span>
+</span><span class='line'>
+</span><span class='line'><span class="kn">import</span> <span class="s">&quot;fmt&quot;</span>
+</span><span class='line'><span class="kn">import</span> <span class="s">&quot;flag&quot;</span>
+</span><span class='line'><span class="kn">import</span> <span class="nx">vector</span> <span class="s">&quot;container/vector&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Send the sequence 2, 3, 4, ... to channel &#39;ch&#39;.</span>
+</span><span class='line'><span class="kd">func</span> <span class="nx">Generate</span><span class="p">(</span><span class="nx">max</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">ch</span> <span class="kd">chan</span><span class="o">&lt;-</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>     <span class="c1">// Slight optimization; after 2 we know there are no even primes so we only</span>
+</span><span class='line'>     <span class="c1">// need to consider odd values</span>
+</span><span class='line'>     <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="mi">2</span>
+</span><span class='line'>     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">3</span><span class="p">;</span> <span class="nx">i</span><span class="o">&lt;=</span><span class="nx">max</span> <span class="p">;</span> <span class="nx">i</span> <span class="o">+=</span> <span class="mi">2</span> <span class="p">{</span>
+</span><span class='line'>       <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="nx">i</span> <span class="c1">// Send &#39;i&#39; to channel &#39;ch&#39;.</span>
+</span><span class='line'>   <span class="p">}</span>
+</span><span class='line'>   <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span> <span class="c1">// Use -1 as an indicator that we&#39;re done now</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">// Copy the values from channel &#39;in&#39; to channel &#39;out&#39;,</span>
+</span><span class='line'><span class="c1">// removing those divisible by &#39;prime&#39;.</span>
+</span><span class='line'><span class="kd">func</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">in</span> <span class="o">&lt;-</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">out</span> <span class="kd">chan</span><span class="o">&lt;-</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">prime</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="o">&lt;-</span> <span class="nx">in</span><span class="p">;</span> <span class="nx">i</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span> <span class="nx">i</span> <span class="p">=</span> <span class="o">&lt;-</span> <span class="nx">in</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>       <span class="k">if</span> <span class="nx">i</span> <span class="o">%</span> <span class="nx">prime</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
+</span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="nx">i</span>
+</span><span class='line'>            <span class="p">}</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>        <span class="nx">out</span> <span class="o">&lt;-</span> <span class="o">-</span><span class="mi">1</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>     <span class="kd">var</span> <span class="nx">target</span> <span class="o">*</span><span class="kt">int</span> <span class="p">=</span> <span class="nx">flag</span><span class="p">.</span><span class="nx">Int</span><span class="p">(</span><span class="s">&quot;target&quot;</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="s">&quot;Number we wish to factor&quot;</span><span class="p">)</span>
+</span><span class='line'>     <span class="nx">flag</span><span class="p">.</span><span class="nx">Parse</span><span class="p">()</span>
+</span><span class='line'>
+</span><span class='line'>     <span class="nx">t</span> <span class="o">:=</span> <span class="o">*</span><span class="nx">target</span>
+</span><span class='line'>     <span class="kd">var</span> <span class="nx">rv</span> <span class="nx">vector</span><span class="p">.</span><span class="nx">IntVector</span>
+</span><span class='line'>
+</span><span class='line'>     <span class="c1">// Retrieve a prime value and see if we can divide the target evenly by</span>
+</span><span class='line'>     <span class="c1">// that prime.  If so perform the multiplication and update the current</span>
+</span><span class='line'>     <span class="c1">// value.</span>
+</span><span class='line'>     <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span> <span class="c1">// Create a new channel.</span>
+</span><span class='line'>     <span class="k">go</span> <span class="nx">Generate</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span><span class="nx">ch</span><span class="p">)</span>      <span class="c1">// Start Generate() as a subprocess.</span>
+</span><span class='line'>     <span class="k">for</span> <span class="nx">prime</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">ch</span><span class="p">;</span> <span class="p">(</span><span class="nx">prime</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="nx">t</span> <span class="p">&gt;</span> <span class="mi">1</span><span class="p">);</span> <span class="nx">prime</span> <span class="p">=</span> <span class="o">&lt;-</span><span class="nx">ch</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>      <span class="k">for</span> <span class="p">;</span><span class="nx">t</span> <span class="o">%</span> <span class="nx">prime</span> <span class="o">==</span> <span class="mi">0</span><span class="p">;</span> <span class="p">{</span>
+</span><span class='line'>          <span class="nx">t</span> <span class="p">=</span> <span class="nx">t</span> <span class="o">/</span> <span class="nx">prime</span>
+</span><span class='line'>      <span class="nx">rv</span><span class="p">.</span><span class="nx">Push</span><span class="p">(</span><span class="nx">prime</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="c1">// Create a goroutine for each prime number whether we use it or</span>
+</span><span class='line'>  <span class="c1">// not.  This performs the daisy chaining setup that was being</span>
+</span><span class='line'>  <span class="c1">// done by the Sieve() function in sieve.go.</span>
+</span><span class='line'>        <span class="nx">ch1</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
+</span><span class='line'>  <span class="k">go</span> <span class="nx">Filter</span><span class="p">(</span><span class="nx">ch</span><span class="p">,</span> <span class="nx">ch1</span><span class="p">,</span> <span class="nx">prime</span><span class="p">)</span>
+</span><span class='line'>  <span class="nx">ch</span> <span class="p">=</span> <span class="nx">ch1</span>
+</span><span class='line'>     <span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'>     <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;Results: %s\n&quot;</span><span class="p">,</span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Sprint</span><span class="p">(</span><span class="nx">rv</span><span class="p">))</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Simple enough. This leaves us with something that looks fairly robust:</p>
+
+<pre><code>[varese go]$ gobuild factor.go 
+Parsing go file(s)...
+Compiling main (factor)...
+Linking factor...
+[varese go]$ ./factor -target 60
+Results: [2 2 3 5]
+</code></pre>
+
+<p>Examples here employ <a href="http://code.google.com/p/gobuild">gobuild</a>. This tool has proven to be very useful when building and testing Go applications. Complete code for both examples can be found on <a href="https://github.com/heuristicfencepost/factorization_benchmark">github</a>. There is some interest in comparing a solution based on goroutines and channels to one based on actors and messages so in the future some Scala code might join the existing Go code.</p>
+</div>
+  
+  
+
+
+    </article>
+  
+  
+    <article>
+      
+  <header>
+    
       <h1 class="entry-title"><a href="/blog/2010/10/10/default-arguments-and-implicit-conversions-in-scala/">Default Arguments and Implicit Conversions in Scala</a></h1>
     
     
