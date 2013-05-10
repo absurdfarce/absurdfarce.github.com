@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: clojure base64 | Absurdity and Farce]]></title>
+  <link href="http://absurdfarce.github.com/blog/categories/clojure-base64/atom.xml" rel="self"/>
+  <link href="http://absurdfarce.github.com/"/>
+  <updated>2013-05-09T22:40:09-05:00</updated>
+  <id>http://absurdfarce.github.com/</id>
+  <author>
+    <name><![CDATA[Bret McGuire]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[base64 in Clojure: An Initial Attempt]]></title>
+    <link href="http://absurdfarce.github.com/blog/2010/10/31/base64-in-clojure-an-initial-attempt/"/>
+    <updated>2010-10-31T12:00:00-05:00</updated>
+    <id>http://absurdfarce.github.com/blog/2010/10/31/base64-in-clojure-an-initial-attempt</id>
+    <content type="html"><![CDATA[<p>Originally published at <a href="http://heuristic-fencepost.blogspot.com/2010/10/base64-in-clojure-initial-attempt.html">Heuristic Fencepost</a></p>
+
+<p>After working through most of Stuart Halloway's excellent <a href="http://pragprog.com/book/shcloj/programming-clojure">Programming Clojure</a> I found myself in search of a meaty example to exercise my Clojure chops. Re-implementing the Project Euler examples in another language didn't seem terribly appealing. Maybe a base64 implementation; I hadn't implemented the encoding in a while and it is a reasonable exercise when learning a new language. So what kind of support does Clojure already have?</p>
+
+<p>As expected there's no base64 support in the core. clojure-contrib does include <a href="http://richhickey.github.io/clojure-contrib/base64-api.html">some support</a>, although the documentation doesn't inspire a great deal of confidence:</p>
+
+<pre><code>This is mainly here as an example.  It is much slower than the Apache Commons Codec implementation or sun.misc.BASE64Encoder.
+</code></pre>
+
+<p>Intriguing; looks like we have a winner!</p>
+
+<p>The only complexity in a base64 implementation is handling the one and two byte cases. Any code must support returning the last two bits of the first byte (or the last four bits of the second byte) as distinct values in these cases as well as combining these bits with the leading bits of the second and third bytes (respectively) in other cases. My initial implementation was a fairly straightforward adaptation of this principle.</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+<span class='line-number'>40</span>
+<span class='line-number'>41</span>
+<span class='line-number'>42</span>
+<span class='line-number'>43</span>
+<span class='line-number'>44</span>
+<span class='line-number'>45</span>
+<span class='line-number'>46</span>
+<span class='line-number'>47</span>
+<span class='line-number'>48</span>
+<span class='line-number'>49</span>
+<span class='line-number'>50</span>
+<span class='line-number'>51</span>
+<span class='line-number'>52</span>
+<span class='line-number'>53</span>
+<span class='line-number'>54</span>
+<span class='line-number'>55</span>
+<span class='line-number'>56</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">ns </span><span class="nv">fencepost.base64_letfn</span><span class="p">)</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="c1">; This could be placed within the defn below but rebuilding this map</span>
+</span><span class='line'><span class="c1">; on each invocation seems a bit wasteful.</span>
+</span><span class='line'><span class="p">(</span><span class="k">def </span><span class="nv">to-base64&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;pre&gt;&lt;code&gt;</span> <span class="p">(</span><span class="nb">zipmap </span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">range </span><span class="mi">0</span> <span class="mi">64</span><span class="p">)</span>
+</span><span class='line'>  <span class="s">&quot;ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/&quot;</span><span class="p">)</span>
+</span><span class='line'> <span class="p">)</span>
+</span><span class='line'><span class="nv">&lt;/code&gt;&lt;/pre&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="p">(</span><span class="kd">defn </span><span class="nv">base64-encode</span>
+</span><span class='line'>  <span class="s">&quot;Encode input string into base64 alphabet.  String should be encoded</span>
+</span><span class='line'><span class="s">  in the character set specified by encoding.&quot;</span>
+</span><span class='line'>  <span class="p">[</span><span class="o">#</span><span class="nv">&lt;sup&gt;String&lt;/sup&gt;</span> <span class="nv">arg</span> <span class="o">#</span><span class="nv">&lt;sup&gt;String&lt;/sup&gt;</span> <span class="nv">encoding</span><span class="p">]</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">letfn</span> <span class="p">[</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;pre&gt;&lt;code&gt;</span>  <span class="p">(</span><span class="nf">do-one-byte</span> <span class="p">[</span><span class="nv">somebyte</span><span class="p">]</span>
+</span><span class='line'>               <span class="p">{</span><span class="ss">:curr</span> <span class="p">[(</span><span class="nb">bit-shift-right </span><span class="nv">somebyte</span> <span class="mi">2</span><span class="p">)]</span> <span class="ss">:remainder</span> <span class="p">(</span><span class="nb">bit-and </span><span class="mi">0</span><span class="nv">x3F</span> <span class="p">(</span><span class="nb">bit-shift-left </span><span class="nv">somebyte</span> <span class="mi">4</span><span class="p">))</span> <span class="p">}</span>
+</span><span class='line'>               <span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">do-two-bytes</span> <span class="p">[</span><span class="nv">somebytes</span><span class="p">]</span>
+</span><span class='line'>                <span class="p">(</span><span class="k">let </span><span class="p">[[</span><span class="nv">byteone</span> <span class="nv">bytetwo</span><span class="p">]</span> <span class="nv">somebytes</span>
+</span><span class='line'>                      <span class="p">{</span><span class="nv">curr</span> <span class="ss">:curr</span> <span class="nv">remainder</span> <span class="ss">:remainder</span><span class="p">}</span> <span class="p">(</span><span class="nf">do-one-byte</span> <span class="nv">byteone</span><span class="p">)]</span>
+</span><span class='line'>                  <span class="p">{</span><span class="ss">:curr</span> <span class="p">(</span><span class="nb">conj </span><span class="nv">curr</span> <span class="p">(</span><span class="nb">bit-or </span><span class="nv">remainder</span> <span class="p">(</span><span class="nb">bit-shift-right </span><span class="nv">bytetwo</span> <span class="mi">4</span><span class="p">)))</span> <span class="ss">:remainder</span> <span class="p">(</span><span class="nb">bit-and </span><span class="mi">0</span><span class="nv">x3F</span> <span class="p">(</span><span class="nb">bit-shift-left </span><span class="nv">bytetwo</span> <span class="mi">2</span><span class="p">))}</span>
+</span><span class='line'>                  <span class="p">)</span>
+</span><span class='line'>                <span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">do-three-bytes</span> <span class="p">[</span><span class="nv">somebytes</span><span class="p">]</span>
+</span><span class='line'>                  <span class="p">(</span><span class="k">let </span><span class="p">[[</span><span class="nv">byteone</span> <span class="nv">bytetwo</span> <span class="nv">bytethree</span><span class="p">]</span> <span class="nv">somebytes</span>
+</span><span class='line'>                        <span class="p">{</span><span class="nv">curr</span> <span class="ss">:curr</span> <span class="nv">remainder</span> <span class="ss">:remainder</span><span class="p">}</span> <span class="p">(</span><span class="nf">do-two-bytes</span> <span class="p">[</span><span class="nv">byteone</span> <span class="nv">bytetwo</span><span class="p">])]</span>
+</span><span class='line'>                    <span class="p">(</span><span class="nb">conj </span><span class="p">(</span><span class="nb">conj </span><span class="nv">curr</span> <span class="p">(</span><span class="nb">bit-or </span><span class="nv">remainder</span> <span class="p">(</span><span class="nb">bit-shift-right </span><span class="nv">bytethree</span> <span class="mi">6</span><span class="p">)))</span> <span class="p">(</span><span class="nb">bit-and </span><span class="mi">0</span><span class="nv">x3F</span> <span class="nv">bytethree</span><span class="p">))</span>
+</span><span class='line'>                    <span class="p">)</span>
+</span><span class='line'>                  <span class="p">)</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">somefn</span> <span class="p">[</span><span class="nv">somechars</span><span class="p">]</span>
+</span><span class='line'>            <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">l</span> <span class="p">(</span><span class="nb">count </span><span class="nv">somechars</span><span class="p">)]</span>
+</span><span class='line'>              <span class="p">(</span><span class="nf">cond</span>
+</span><span class='line'>               <span class="p">(</span><span class="nb">= </span><span class="nv">l</span> <span class="mi">3</span><span class="p">)</span>
+</span><span class='line'>               <span class="p">(</span><span class="nb">apply str </span><span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">to-base64</span> <span class="nv">%</span><span class="p">)</span> <span class="p">(</span><span class="nf">do-three-bytes</span> <span class="nv">somechars</span><span class="p">)))</span>
+</span><span class='line'>               <span class="p">(</span><span class="nb">= </span><span class="nv">l</span> <span class="mi">2</span><span class="p">)</span>
+</span><span class='line'>               <span class="p">(</span><span class="k">let </span><span class="p">[{</span><span class="nv">curr</span> <span class="ss">:curr</span> <span class="nv">remainder</span> <span class="ss">:remainder</span><span class="p">}</span> <span class="p">(</span><span class="nf">do-two-bytes</span> <span class="nv">somechars</span><span class="p">)]</span>
+</span><span class='line'>                 <span class="p">(</span><span class="nb">str </span><span class="p">(</span><span class="nb">apply str </span><span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">to-base64</span> <span class="nv">%</span><span class="p">)</span> <span class="nv">curr</span><span class="p">))</span> <span class="p">(</span><span class="nf">to-base64</span> <span class="nv">remainder</span><span class="p">)</span> <span class="s">&quot;=&quot;</span><span class="p">)</span>
+</span><span class='line'>                 <span class="p">)</span>
+</span><span class='line'>               <span class="p">(</span><span class="nb">= </span><span class="nv">l</span> <span class="mi">1</span><span class="p">)</span>
+</span><span class='line'>               <span class="p">(</span><span class="k">let </span><span class="p">[{</span><span class="nv">curr</span> <span class="ss">:curr</span> <span class="nv">remainder</span> <span class="ss">:remainder</span><span class="p">}</span> <span class="p">(</span><span class="nf">do-one-byte</span> <span class="p">(</span><span class="nb">first </span><span class="nv">somechars</span><span class="p">))]</span>
+</span><span class='line'>                 <span class="p">(</span><span class="nb">str </span><span class="p">(</span><span class="nb">apply str </span><span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">to-base64</span> <span class="nv">%</span><span class="p">)</span> <span class="nv">curr</span><span class="p">))</span> <span class="p">(</span><span class="nf">to-base64</span> <span class="nv">remainder</span><span class="p">)</span> <span class="s">&quot;==&quot;</span><span class="p">)</span>
+</span><span class='line'>                 <span class="p">))))]</span>
+</span><span class='line'><span class="p">(</span><span class="nb">apply str </span><span class="p">(</span><span class="nb">map </span><span class="nv">somefn</span> <span class="p">(</span><span class="nf">partition</span> <span class="mi">3</span> <span class="mi">3</span> <span class="p">()</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="nv">arg</span> <span class="nv">encoding</span><span class="p">))))))</span>
+</span><span class='line'><span class="nv">&lt;/code&gt;&lt;/pre&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="p">(</span><span class="kd">defn </span><span class="nv">base64-encode-ascii</span>
+</span><span class='line'>  <span class="s">&quot;Encode input string into base64 alphabet.  Input string is assumed</span>
+</span><span class='line'><span class="s">  to be encoded in UTF-8.  If the input is encoded with a different</span>
+</span><span class='line'><span class="s">  character set base64-encode should be used instead of this method.&quot;</span>
+</span><span class='line'>  <span class="p">[</span><span class="o">#</span><span class="nv">&lt;sup&gt;String&lt;/sup&gt;</span> <span class="nv">arg</span><span class="p">]</span>
+</span><span class='line'>  <span class="p">(</span><span class="nf">base64-encode</span> <span class="nv">arg</span> <span class="s">&quot;UTF8&quot;</span><span class="p">)</span>
+</span><span class='line'>  <span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>The core consists of a letfn definition with functions for handling the one, two and three byte cases. Each function returns two values: a list of all 6-bit elements discovered so far as well a "remainder" value representing the trailing bits in the one and two byte cases. This structure leads to better function re-use; as an example the two-byte function can build on the one-byte function. A wrapper function calls the correct value for a given set of bytes. Now we need only partition our byte array into groups of three or less and apply the wrapper function to each group. A combination of the partition and map functions do exactly that.</p>
+
+<p>So how'd we do? We implement a simple test program to generate a set of random data, map a base64 implementation on to each sample and then realize the lazy sequence by converting it into a vector. We time this conversion (for a common set of sample data) for our implementation, the clojure-contrib implementation and commons-codec. We wind up with the following:</p>
+
+<p><div class='bogus-wrapper'><notextile><figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+<span class='line-number'>32</span>
+<span class='line-number'>33</span>
+<span class='line-number'>34</span>
+<span class='line-number'>35</span>
+<span class='line-number'>36</span>
+<span class='line-number'>37</span>
+<span class='line-number'>38</span>
+<span class='line-number'>39</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">ns </span><span class="nv">fencepost.test</span><span class="p">)</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="p">(</span><span class="nb">import </span><span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.commons.codec.binary</span> <span class="nv">Base64</span><span class="p">))</span>
+</span><span class='line'><span class="p">(</span><span class="nb">import </span><span class="o">&#39;</span><span class="p">(</span><span class="nf">org.apache.commons.lang</span> <span class="nv">RandomStringUtils</span><span class="p">))</span>
+</span><span class='line'><span class="p">(</span><span class="nf">use</span> <span class="o">&#39;</span><span class="p">[</span><span class="nv">clojure.contrib.base64</span><span class="p">])</span>
+</span><span class='line'><span class="p">(</span><span class="nf">use</span> <span class="o">&#39;</span><span class="p">[</span><span class="nv">fencepost.base64_letfn</span><span class="p">])</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="p">(</span><span class="k">def </span><span class="nv">sample-size</span> <span class="mi">100</span><span class="p">)</span>
+</span><span class='line'><span class="p">(</span><span class="k">def </span><span class="nv">max-string-size</span> <span class="mi">256</span><span class="p">)</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="c1">; Build up some sample data using commons-lang.  Sample data is built</span>
+</span><span class='line'><span class="c1">; before any tests are run; this allows us to apply uniform test data</span>
+</span><span class='line'><span class="c1">; to each implementation and to avoid corrupting timings with the</span>
+</span><span class='line'><span class="c1">; generation of random data.</span>
+</span><span class='line'><span class="p">(</span><span class="k">def </span><span class="nv">sample-data</span> <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">RandomStringUtils/randomAscii</span> <span class="p">(</span><span class="nb">* </span><span class="nv">%</span> <span class="p">(</span><span class="nb">rand-int </span><span class="nv">max-string-size</span><span class="p">)))</span> <span class="p">(</span><span class="nb">repeat </span><span class="nv">sample-size</span> <span class="mi">1</span><span class="p">)))</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="c1">; Instantiate a Base64 instance from commons-codec</span>
+</span><span class='line'><span class="p">(</span><span class="k">def </span><span class="nv">codec-base64</span> <span class="p">(</span><span class="k">new </span><span class="nv">Base64</span> <span class="mi">-1</span><span class="p">))</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="c1">; Time each run.  Mapping a function onto our sample data produces a</span>
+</span><span class='line'><span class="c1">; lazy sequence so we have to take the additional step of realizing</span>
+</span><span class='line'><span class="c1">; the sequence; thus the conversion to a vector.</span>
+</span><span class='line'><span class="p">(</span><span class="nb">println </span><span class="s">&quot;Commons-codec&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="p">(</span><span class="k">def </span><span class="nv">commons-codec-data</span> <span class="p">(</span><span class="nb">time </span><span class="p">(</span><span class="nf">vec</span> <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="k">new </span><span class="nv">String</span> <span class="p">(</span><span class="nf">.encode</span> <span class="nv">codec-base64</span> <span class="p">(</span><span class="nf">.getBytes</span> <span class="nv">%</span><span class="p">)))</span> <span class="nv">sample-data</span><span class="p">))))</span>
+</span><span class='line'><span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nb">get </span><span class="nv">commons-codec-data</span> <span class="mi">0</span><span class="p">))</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="p">(</span><span class="nb">println </span><span class="s">&quot;clojure-contrib&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="p">(</span><span class="k">def </span><span class="nv">clojure-contrib-data</span> <span class="p">(</span><span class="nb">time </span><span class="p">(</span><span class="nf">vec</span> <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">clojure.contrib.base64/encode-str</span> <span class="nv">%</span><span class="p">)</span> <span class="nv">sample-data</span><span class="p">))))</span>
+</span><span class='line'><span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nb">get </span><span class="nv">clojure-contrib-data</span> <span class="mi">0</span><span class="p">))</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="c1">; Simple sanity check; take commons-codec output as canonical and</span>
+</span><span class='line'><span class="c1">; verify that what our implementations generate match up with the</span>
+</span><span class='line'><span class="c1">; canonical sample.</span>
+</span><span class='line'><span class="p">(</span><span class="nb">assert </span><span class="p">(</span><span class="nf">.equals</span><span class="p">(</span><span class="nb">get </span><span class="nv">commons-codec-data</span> <span class="mi">0</span><span class="p">)</span> <span class="p">(</span><span class="nb">get </span><span class="nv">clojure-contrib-data</span> <span class="mi">0</span><span class="p">)))</span><span class="nv">&lt;/p&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="nv">&lt;p&gt;</span><span class="p">(</span><span class="nb">println </span><span class="s">&quot;fencepost/base64_letfn&quot;</span><span class="p">)</span>
+</span><span class='line'><span class="p">(</span><span class="k">def </span><span class="nv">fencepost-data</span> <span class="p">(</span><span class="nb">time </span><span class="p">(</span><span class="nf">vec</span> <span class="p">(</span><span class="nb">map </span><span class="o">#</span><span class="p">(</span><span class="nf">fencepost.base64_letfn/base64-encode-ascii</span> <span class="nv">%</span><span class="p">)</span> <span class="nv">sample-data</span><span class="p">))))</span>
+</span><span class='line'><span class="p">(</span><span class="nb">println </span><span class="p">(</span><span class="nb">get </span><span class="nv">fencepost-data</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'><span class="p">(</span><span class="nb">assert </span><span class="p">(</span><span class="nf">.equals</span> <span class="p">(</span><span class="nb">get </span><span class="nv">commons-codec-data</span> <span class="mi">0</span><span class="p">)</span> <span class="p">(</span><span class="nb">get </span><span class="nv">fencepost-data</span> <span class="mi">0</span><span class="p">)))</span>
+</span></code></pre></td></tr></table></div></figure></notextile></div></p>
+
+<p>The following run is fairly representative:</p>
+
+<pre><code>bartok ~/git/base64-clojure $ clojure fencepost/test/compare_base64.clj 
+Commons-codec
+"Elapsed time: 69.074926 msecs"
+RFJlYWkqIF10RCc1PXlpO3FcIDY6dkJuQkhHNWxRJkwkOFdgciFGfHwhYz5EYG15PjxWdFJ9Ml83TGFoeltHSTs+ST9mdj0rfSZrcVNIKn5oKSdTI3U5a1FqIzBvIkRIV0BkK3xCZjtrSWYuTiM1XWB9UW14W2dVLFM=
+clojure-contrib
+"Elapsed time: 1221.124746 msecs"
+RFJlYWkqIF10RCc1PXlpO3FcIDY6dkJuQkhHNWxRJkwkOFdgciFGfHwhYz5EYG15PjxWdFJ9Ml83TGFoeltHSTs+ST9mdj0rfSZrcVNIKn5oKSdTI3U5a1FqIzBvIkRIV0BkK3xCZjtrSWYuTiM1XWB9UW14W2dVLFM=
+fencepost/base64_letfn
+"Elapsed time: 375.829153 msecs"
+RFJlYWkqIF10RCc1PXlpO3FcIDY6dkJuQkhHNWxRJkwkOFdgciFGfHwhYz5EYG15PjxWdFJ9Ml83TGFoeltHSTs+ST9mdj0rfSZrcVNIKn5oKSdTI3U5a1FqIzBvIkRIV0BkK3xCZjtrSWYuTiM1XWB9UW14W2dVLFM=
+</code></pre>
+
+<p>These results do confirm that that clojure-contrib implementation is very, very slow in relation to commons-codec. We've reduced that runtime by roughly a third but we're still five or six times slower than commons-codec. Surely we can do better; in the next installment we'll see how to do so.</p>
+
+<p>As usual all code can be found on <a href="https://github.com/heuristicfencepost/base64-clojure">github</a>.</p>
+]]></content>
+  </entry>
+  
+</feed>
