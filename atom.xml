@@ -4,7 +4,7 @@
   <title><![CDATA[Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-05-09T23:23:07-05:00</updated>
+  <updated>2013-12-27T16:06:35-06:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -12,6 +12,190 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[On Reading SICP Again After Many Years: Exercise 1.11]]></title>
+    <link href="http://absurdfarce.github.com/blog/2013/12/27/on-reading-sicp-again-after-many-years-exercise-1-dot-11/"/>
+    <updated>2013-12-27T15:23:00-06:00</updated>
+    <id>http://absurdfarce.github.com/blog/2013/12/27/on-reading-sicp-again-after-many-years-exercise-1-dot-11</id>
+    <content type="html"><![CDATA[<p>The last time I had occasion to work my way through <a href="http://en.wikipedia.org/wiki/Structure_and_Interpretation_of_Computer_Programs">SICP</a> I found myself reading the first edition&#8230; because that&#8217;s all there was.  So when some of my fellow developers at <a href="http://www.code42.com">my day job</a> started up a technical book club and led off with the second edition of SICP I was quite intrigued.  This post reflects the first of (hopefully) several observations on re-reading a classic.</p>
+
+<p>At a recent meetup for this book club one of the exercises in the book gathered a fair share of attention.  That exercise, 1.11, can be found in the <a href="http://mitpress.mit.edu/sicp/full-text/book/book.html">HTML version of the second edition</a> and reads as follows:</p>
+
+<pre><code>Exercise 1.11.  A function f is defined by the rule that f(n) = n if n&lt;3 and 
+f(n) = f(n - 1) + 2f(n - 2) + 3f(n - 3) if n&gt; 3.   Write a procedure that 
+computes f by means of a recursive process. Write a procedure that computes 
+f by means of an iterative process.
+</code></pre>
+
+<p>We consider this problem from the perspective of Haskell, Scheme and Clojure.  The sample code below was known to run correctly on GHC 6.12.1, Chicken Scheme 4.5.0 and Clojure 1.5.1 via Leiningen [1].</p>
+
+<p>A Haskell version of the recursive process is almost a literal transcription of the problem statement:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='haskell'><span class='line'><span class="nf">recurFn</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Int</span>
+</span><span class='line'><span class="nf">recurFn</span> <span class="n">x</span>
+</span><span class='line'>  <span class="o">|</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="mi">3</span> <span class="ow">=</span> <span class="n">x</span>
+</span><span class='line'>  <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">b</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">c</span><span class="p">)</span>
+</span><span class='line'>  <span class="kr">where</span> <span class="n">a</span> <span class="ow">=</span> <span class="n">recurFn</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+</span><span class='line'>        <span class="n">b</span> <span class="ow">=</span> <span class="n">recurFn</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>
+</span><span class='line'>        <span class="n">c</span> <span class="ow">=</span> <span class="n">recurFn</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="mi">3</span><span class="p">)</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>This translates into some fairly straightforward Scheme:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="k">define </span><span class="nv">recur-fn</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">x</span><span class="p">)</span>
+</span><span class='line'>    <span class="c1">;(printf &quot;recur-fn, x=~s\n&quot; x)</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">x</span> <span class="mi">3</span><span class="p">)</span>
+</span><span class='line'>  <span class="nv">x</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">+ </span><span class="p">(</span><span class="nf">recur-fn</span> <span class="p">(</span><span class="nb">- </span><span class="nv">x</span> <span class="mi">1</span><span class="p">))</span>
+</span><span class='line'>     <span class="p">(</span><span class="nb">* </span><span class="mi">2</span> <span class="p">(</span><span class="nf">recur-fn</span> <span class="p">(</span><span class="nb">- </span><span class="nv">x</span> <span class="mi">2</span><span class="p">)))</span>
+</span><span class='line'>     <span class="p">(</span><span class="nb">* </span><span class="mi">3</span> <span class="p">(</span><span class="nf">recur-fn</span> <span class="p">(</span><span class="nb">- </span><span class="nv">x</span> <span class="mi">3</span><span class="p">)))))))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>The problem is that we&#8217;ve also got a straightforward instance of tree recursion here.  To highlight this fact uncomment the printf statement in the above code and compute the value of (recur-fn 4):</p>
+
+<pre><code>@stravinsky:~/git/sicp/1-11/scheme$ grep printf 1-11.scm 
+    (printf "recur-fn, x=~s\n" x)
+(printf "recur-fn for 4: ~s\n" (recur-fn 4))
+@stravinsky:~/git/sicp/1-11/scheme$ csc 1-11.scm 
+@stravinsky:~/git/sicp/1-11/scheme$ ./1-11 
+recur-fn for 4: recur-fn, x=4
+recur-fn, x=3
+recur-fn, x=2
+recur-fn, x=1
+recur-fn, x=0
+recur-fn, x=2
+recur-fn, x=1
+11
+</code></pre>
+
+<p>A moment of reflection should make it clear that this is exactly the behaviour you&#8217;d expect to see from tree recursion.</p>
+
+<p>So what might an iterative solution look like?  The base case of our recursive definition is f(0), f(1) and f(2) and larger values of f(x) build on smaller values so it seems fairly obvious that we want an ascending iteration from the values that make up our base case.  At each iteration we might add the newly-computed value to a list of observed values, returning the last value from this list once we&#8217;ve iterated up to our input value [2].  Another moment of reflection allows us to see that what we&#8217;re describing is a <em>fold</em> which produces a list as it&#8217;s value.  Fold (sometimes called <em>reduce</em> or, in <a href="http://groovy.codehaus.org">really odd languages</a>, <em>inject</em>&#8230; for no obvious reason [3]) is a higher-order function, a topic which will be covered in the next chapter.</p>
+
+<p>One might object that a list of values, one for each index in our iteration, sounds a lot more like a <em>map</em> operation than a fold/reduce.  And you&#8217;d be correct&#8230; so long as you don&#8217;t consider the inputs.  A map operation is allowed a single input, in this case the index of an item in the list, and that input isn&#8217;t sufficient to compute values of f(x) for x >= 3; the history we need to consider is simply lost.  But a fold/reduce operation introduces the notion of an accumulator (of some arbitrary type) which is also made available to our computation as a parameter.  So long as that accumulator has access to the history of our computation our function has all the inputs it needs.  And if our accumulator is nothing more than a repository of previously-computed values (in the form of, say, a list) we have exactly that history.</p>
+
+<p>The key here is the realization that fold/reduce is isomorphic onto a recursive procedure which is also an iterative process:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="k">define </span><span class="nv">my-fold</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">fn</span> <span class="nv">acc</span> <span class="nv">idxs</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">= </span><span class="mi">0</span> <span class="p">(</span><span class="nb">length </span><span class="nv">idxs</span><span class="p">))</span>
+</span><span class='line'>        <span class="nv">acc</span>
+</span><span class='line'>        <span class="p">(</span><span class="nf">my-fold</span> <span class="nv">fn</span> <span class="p">(</span><span class="nf">fn</span> <span class="p">(</span><span class="nb">car </span><span class="nv">idxs</span><span class="p">)</span> <span class="nv">acc</span><span class="p">)</span> <span class="p">(</span><span class="nb">cdr </span><span class="nv">idxs</span><span class="p">)))))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>So we crank out an implementation based on fold, using a few of the methods from <a href="http://srfi.schemers.org/srfi-1/srfi-1.html">SRFI-1</a> to simplify things just a little bit:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+</pre></td><td class='code'><pre><code class='scheme'><span class='line'><span class="p">(</span><span class="nf">use</span> <span class="nv">srfi-1</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="c1">; Use some of the list manipulation methods from SRFI-1 to make our lives easier                                                                                                 (define iter-fn</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">x</span><span class="p">)</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">define </span><span class="nv">compute-value</span>
+</span><span class='line'>      <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">prevs</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">(</span><span class="k">letrec </span><span class="p">((</span><span class="nf">prevs-last</span> <span class="p">(</span><span class="nf">take-right</span> <span class="nv">prevs</span> <span class="mi">3</span><span class="p">))</span>
+</span><span class='line'>                 <span class="p">(</span><span class="nf">c</span> <span class="p">(</span><span class="nb">car </span><span class="nv">prevs-last</span><span class="p">))</span>
+</span><span class='line'>                 <span class="p">(</span><span class="nf">b</span> <span class="p">(</span><span class="nb">cadr </span><span class="nv">prevs-last</span><span class="p">))</span>
+</span><span class='line'>                 <span class="p">(</span><span class="nf">a</span> <span class="p">(</span><span class="nb">caddr </span><span class="nv">prevs-last</span><span class="p">)))</span>
+</span><span class='line'>        <span class="p">(</span><span class="nb">+ </span><span class="nv">a</span> <span class="p">(</span><span class="nb">* </span><span class="mi">2</span> <span class="nv">b</span><span class="p">)</span> <span class="p">(</span><span class="nb">* </span><span class="mi">3</span> <span class="nv">c</span><span class="p">)))))</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">x</span> <span class="mi">3</span><span class="p">)</span>
+</span><span class='line'>        <span class="nv">x</span>
+</span><span class='line'>        <span class="p">(</span><span class="k">letrec </span><span class="p">((</span><span class="nf">range</span> <span class="p">(</span><span class="nf">iota</span> <span class="p">(</span><span class="nb">- </span><span class="nv">x</span> <span class="mi">2</span><span class="p">)</span> <span class="mi">3</span><span class="p">))</span>
+</span><span class='line'>                 <span class="p">(</span><span class="nf">fold-fn</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">x</span> <span class="nv">prevs</span><span class="p">)</span> <span class="p">(</span><span class="nb">append </span><span class="nv">prevs</span> <span class="p">(</span><span class="nb">list </span><span class="p">(</span><span class="nf">compute-value</span> <span class="nv">prevs</span><span class="p">)))))</span>
+</span><span class='line'>                 <span class="p">(</span><span class="nf">vals</span> <span class="p">(</span><span class="nf">fold</span> <span class="nv">fold-fn</span> <span class="o">&#39;</span><span class="p">(</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="nv">range</span><span class="p">)))</span>
+</span><span class='line'>          <span class="p">(</span><span class="nf">last</span> <span class="nv">vals</span><span class="p">)))))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>For kicks we do a quick translation of the iterative process into Clojure, and don&#8217;t tell the Scheme people but there&#8217;s something to this &#8220;syntactic sugar&#8221; stuff.  The use of destructuring here makes the function much more concise:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">iter-fn</span> <span class="p">[</span><span class="nv">x</span><span class="p">]</span>
+</span><span class='line'>  <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">x</span> <span class="mi">3</span><span class="p">)</span>
+</span><span class='line'>    <span class="nv">x</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">let </span><span class="p">[</span><span class="nv">compute-fn</span> <span class="p">(</span><span class="k">fn </span><span class="p">[</span><span class="nv">prevs</span><span class="p">]</span>
+</span><span class='line'>                       <span class="p">(</span><span class="k">let </span><span class="p">[[</span><span class="nv">c</span> <span class="nv">b</span> <span class="nv">a</span><span class="p">]</span> <span class="p">(</span><span class="nf">take-last</span> <span class="mi">3</span> <span class="nv">prevs</span><span class="p">)]</span>
+</span><span class='line'>                         <span class="p">(</span><span class="nb">+ </span><span class="nv">a</span> <span class="p">(</span><span class="nb">* </span><span class="mi">2</span> <span class="nv">b</span><span class="p">)</span> <span class="p">(</span><span class="nb">* </span><span class="mi">3</span> <span class="nv">c</span><span class="p">))))</span>
+</span><span class='line'>          <span class="nv">reduce-fn</span> <span class="p">(</span><span class="k">fn </span><span class="p">[</span><span class="nv">col</span> <span class="nv">val</span><span class="p">]</span> <span class="p">(</span><span class="nb">conj </span><span class="nv">col</span> <span class="p">(</span><span class="nf">compute-fn</span> <span class="nv">col</span><span class="p">)))</span>
+</span><span class='line'>          <span class="nb">vals </span><span class="p">(</span><span class="nb">reduce </span><span class="nv">reduce-fn</span> <span class="p">[</span><span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span><span class="p">]</span> <span class="p">(</span><span class="nb">range </span><span class="mi">3</span> <span class="p">(</span><span class="nb">+ </span><span class="nv">x</span> <span class="mi">1</span><span class="p">)))]</span>
+</span><span class='line'>            <span class="p">(</span><span class="nb">last </span><span class="nv">vals</span><span class="p">))))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Unfortunately the same can&#8217;t be said of the recursive process.  Clojure can&#8217;t do much to save us here.  Be forewarned; the code that follows is intended for mature audiences only.  The multiple instances of recursion outside of the loop/recur forms is very likely to induce eye bleeding in any seasoned Clojure programmer:</p>
+
+<figure class='code'> <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='clojure'><span class='line'><span class="c1">; Recursive version... with sufficient eye bleeding</span>
+</span><span class='line'><span class="p">(</span><span class="kd">defn </span><span class="nv">recur-fn</span> <span class="p">[</span><span class="nv">x</span><span class="p">]</span>
+</span><span class='line'>    <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nb">&lt; </span><span class="nv">x</span> <span class="mi">3</span><span class="p">)</span>
+</span><span class='line'>  <span class="nv">x</span>
+</span><span class='line'>  <span class="p">(</span><span class="nb">+ </span><span class="p">(</span><span class="nf">recur-fn</span> <span class="p">(</span><span class="nb">- </span><span class="nv">x</span> <span class="mi">1</span><span class="p">))</span>
+</span><span class='line'>     <span class="p">(</span><span class="nb">* </span><span class="mi">2</span> <span class="p">(</span><span class="nf">recur-fn</span> <span class="p">(</span><span class="nb">- </span><span class="nv">x</span> <span class="mi">2</span><span class="p">)))</span>
+</span><span class='line'>     <span class="p">(</span><span class="nb">* </span><span class="mi">3</span> <span class="p">(</span><span class="nf">recur-fn</span> <span class="p">(</span><span class="nb">- </span><span class="nv">x</span> <span class="mi">3</span><span class="p">))))))</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>[1] I&#8217;m finally starting to come around when it comes to Leiningen.  Language-specific builders still irritate me, but at least this one seems sensible.</p>
+
+<p>[2] We really only need to preserve three values in our list at any given time in order to maintain enough state to define the computation at every point.  We could move to something like this in the future if necessary, but doing it now doesn&#8217;t do anything to enhance the logic of our solution.</p>
+
+<p>[3] Ruby gets a pass here (but just barely) since it offers both inject and reduce.  That said, I expect better from you, Ruby!</p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Ruby, Perl and Eloquence]]></title>

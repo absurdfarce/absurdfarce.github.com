@@ -89,8 +89,14 @@
         <lastmod>2013-04-11T01:03:50-05:00</lastmod>
     </url>
     <url>
+        <loc>
+            http://absurdfarce.github.com/blog/2013/12/27/on-reading-sicp-again-after-many-years-exercise-1-dot-11/
+        </loc>
+        <lastmod>2013-12-27T16:04:41-06:00</lastmod>
+    </url>
+    <url>
         <loc>http://absurdfarce.github.com/blog/archives/</loc>
-        <lastmod>2013-05-09T23:22:54-05:00</lastmod>
+        <lastmod>2013-12-27T16:04:41-06:00</lastmod>
     </url>
     <url>
         <loc>http://absurdfarce.github.com/robots.txt</loc>
@@ -98,6 +104,6 @@
     </url>
     <url>
         <loc>http://absurdfarce.github.com/</loc>
-        <lastmod>2013-05-09T23:22:54-05:00</lastmod>
+        <lastmod>2013-12-27T16:04:41-06:00</lastmod>
     </url>
 </urlset>
