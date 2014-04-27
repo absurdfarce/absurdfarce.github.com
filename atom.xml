@@ -4,7 +4,7 @@
   <title><![CDATA[Absurdity and Farce]]></title>
   <link href="http://absurdfarce.github.com/atom.xml" rel="self"/>
   <link href="http://absurdfarce.github.com/"/>
-  <updated>2013-12-27T16:06:35-06:00</updated>
+  <updated>2014-04-27T18:23:20-05:00</updated>
   <id>http://absurdfarce.github.com/</id>
   <author>
     <name><![CDATA[Bret McGuire]]></name>
@@ -396,7 +396,7 @@ recur-fn, x=1
 
 <p>[3] Python does a lot of things very, very well, but this solution to this problem seems unnecessarily verbose.</p>
 
-<p>[4] The requirement to declare foo in advance when using the modifier form of if was a bit surprising. Shifting to an if expression removed this requirement; in that case assignment in the condition. The upcoming Perl version also didn&#8217;t require this advance declaration when using an equivalent to the modifier form. An MRI quirk, perhaps?</p>
+<p>[4] The requirement to declare foo in advance with this conditional modifier form was a bit surprising. Shifting to a more conventional if-test-end form removed this requirement, although this isn&#8217;t too surprising since you have an explicit assignment in the if test. The Perl version also didn&#8217;t require this advance declaration when using the conditional modifier form. An MRI quirk, perhaps?</p>
 ]]></content>
   </entry>
   
