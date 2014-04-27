@@ -129,4 +129,4 @@ Answers to this question (and others like it) are what I'm hoping to get out of 
 
 [3] Python does a lot of things very, very well, but this solution to this problem seems unnecessarily verbose. 
 
-[4] The requirement to declare foo in advance when using the modifier form of if was a bit surprising. Shifting to an if expression removed this requirement; in that case assignment in the condition. The upcoming Perl version also didn't require this advance declaration when using an equivalent to the modifier form. An MRI quirk, perhaps?
+[4] The requirement to declare foo in advance with this conditional modifier form was a bit surprising. Shifting to a more conventional if-test-end form removed this requirement, although this isn't too surprising since you have an explicit assignment in the if test. The Perl version also didn't require this advance declaration when using the conditional modifier form. An MRI quirk, perhaps?
